@@ -4048,7 +4048,12 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         if (!mounted) return;
         if (assetBytes == null) continue;
 
-        if (processed > 0) notifier.addPage();
+        // The first PDF page reuses the current page only while it is empty;
+        // on top of existing content it would hide it.
+        if (processed > 0 ||
+            (ref.read(canvasProvider)?.currentPage?.layers.content.isNotEmpty ?? false)) {
+          notifier.addPage();
+        }
 
         // Pin the target page NOW, in the same sync block as the image
         // insert below: the text-layer extraction that follows awaits, and
