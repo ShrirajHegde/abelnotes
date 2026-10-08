@@ -19,7 +19,8 @@ String sanitiseForFilename(String raw) {
 
 /// Write [data] wherever the user wants it. iOS/macOS go through the system
 /// share sheet (FilePicker.saveFile is broken there); everything else gets a
-/// native save dialog.
+/// native save dialog. On Android that dialog writes [data] itself (the
+/// returned path is not writable from Dart); desktop dialogs only pick a path.
 Future<void> saveOrShareFile(
   BuildContext context, {
   required String fileName,
@@ -49,8 +50,9 @@ Future<void> saveOrShareFile(
     fileName: fileName,
     type: FileType.custom,
     allowedExtensions: [fileName.split('.').last],
+    bytes: data,
   );
-  if (savePath != null) {
+  if (savePath != null && !io.Platform.isAndroid) {
     await io.File(savePath).writeAsBytes(data, flush: true);
   }
 }

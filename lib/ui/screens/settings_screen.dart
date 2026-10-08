@@ -1189,9 +1189,11 @@ class _StorageSection extends ConsumerWidget {
           fileName: fileName,
           type: FileType.custom,
           allowedExtensions: const ['zip'],
+          bytes: Uint8List.fromList(zipBytes),
         );
         if (savePath == null) return;
-        await File(savePath).writeAsBytes(zipBytes);
+        // Android's save dialog has already written the bytes.
+        if (!Platform.isAndroid) await File(savePath).writeAsBytes(zipBytes);
       }
       if (!context.mounted) return;
       messenger.showSnackBar(
