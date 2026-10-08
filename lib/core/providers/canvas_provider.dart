@@ -66,6 +66,22 @@ final canvasProvider =
 /// between a 200-element walk dominating the main thread and not.
 final Expando<Rect> _strokeBboxCache = Expando<Rect>();
 
+/// Keeps [before]'s PDF text layer on [after] while its source image is unchanged;
+/// a moved, cropped or deleted image would leave the text misaligned, so it goes.
+PageData carryPdfTextLayer(PageData before, PageData after) {
+  final layer = before.pdfTextLayer;
+  if (layer == null || after.pdfTextLayer != null) return after;
+  ImageData? source(PageData page) {
+    for (final e in page.layers.content) {
+      final data = e.mapOrNull(image: (i) => i.data);
+      if (data != null && data.assetPath == layer.sourceAssetPath) return data;
+    }
+    return null;
+  }
+  final kept = source(before);
+  return kept != null && kept == source(after) ? after.copyWith(pdfTextLayer: layer) : after;
+}
+
 class CanvasNotifier extends StateNotifier<CanvasState?> {
   final Ref _ref;
   // Track whether we've pushed undo for the current eraser/drag gesture
@@ -2763,7 +2779,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
     final undoStack = _pushUndo(s, fileName, page);
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId,
       pageNumber: page.pageNumber,
       width: page.width,
@@ -2780,7 +2796,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       assetReferences: page.assetReferences,
       createdAt: page.createdAt,
       modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -4122,13 +4138,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
     if (!changed) return;
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: newContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     // Stash the latest computed page locally; commit to `state` at most
     // every [_eraseFlushInterval] (or immediately on pointer-up via
@@ -4413,13 +4429,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       height: sel.bounds.height * scaleFactor,
     );
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -4503,13 +4519,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       return updated;
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -4632,13 +4648,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       );
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(postPage, PageData(
       pageId: postPage.pageId, pageNumber: postPage.pageNumber,
       width: postPage.width, height: postPage.height,
       layers: RenderingLayers(background: postPage.layers.background, content: updatedContent),
       assetReferences: postPage.assetReferences,
       createdAt: postPage.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(postState.pages);
     updatedPages[fileName] = updatedPage;
@@ -4776,13 +4792,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       return !sel.selectedIds.contains(id);
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: filteredContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -4834,13 +4850,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       );
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -4885,13 +4901,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       );
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -5679,7 +5695,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         : built.map((e) => _translateElement(e, Offset(0, dy))).toList();
 
     final undoStack = _pushUndo(s, fileName, page);
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(
@@ -5687,7 +5703,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
           content: [...page.layers.content, ...placed]),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
 
@@ -5787,14 +5803,14 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final newContent = List<ContentElement>.from(page.layers.content);
     newContent[idx] = old.copyWith(data: newData);
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(
           background: page.layers.background, content: newContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
 
@@ -5838,7 +5854,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   }
 
   PageData _pageWithNewElement(PageData page, ContentElement element) {
-    return PageData(
+    return carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(
@@ -5847,7 +5863,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       ),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
   }
 
   ContentElement _translateElement(ContentElement element, Offset offset) {
@@ -6012,13 +6028,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       return _translateElement(element, delta);
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -6114,14 +6130,14 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final newContent = List<ContentElement>.from(page.layers.content);
     newContent[idx] = old.copyWith(data: newData);
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(
           background: page.layers.background, content: newContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
     state = s.copyWith(pages: updatedPages, isDirty: true);
@@ -6212,13 +6228,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       );
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -6268,13 +6284,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       );
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -6294,13 +6310,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       return id != elementId;
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: filteredContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -6460,13 +6476,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   }
 
   void _updatePageContent(CanvasState s, PageData page, String fileName, List<ContentElement> content, List<UndoEntry> undoStack) {
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: content),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
     state = s.copyWith(pages: updatedPages, undoStack: undoStack, redoStack: [], isDirty: true);
@@ -6956,13 +6972,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       );
     }).toList();
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: updatedContent),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -7124,13 +7140,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       }
     }
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: [...page.layers.content, ...newElements]),
       assetReferences: [...page.assetReferences, ...newRefs],
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
@@ -7222,7 +7238,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       ));
     }
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId,
       pageNumber: page.pageNumber,
       width: page.width,
@@ -7234,7 +7250,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       assetReferences: page.assetReferences,
       createdAt: page.createdAt,
       modifiedAt: DateTime.now(),
-    );
+    ));
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = updatedPage;
 
@@ -7547,13 +7563,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       ),
     );
 
-    final updatedPage = PageData(
+    final updatedPage = carryPdfTextLayer(currentPage, PageData(
       pageId: currentPage.pageId, pageNumber: currentPage.pageNumber,
       width: currentPage.width, height: currentPage.height,
       layers: RenderingLayers(background: currentPage.layers.background, content: [...currentPage.layers.content, imgElement]),
       assetReferences: currentPage.assetReferences,
       createdAt: currentPage.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(current.pages);
     updatedPages[currentFileName] = updatedPage;
@@ -8272,7 +8288,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final pageNum = s.pageCount + 1;
     final fileName = _nextPageFileName(s);
 
-    final newPage = PageData(
+    final newPage = carryPdfTextLayer(sourcePage, PageData(
       pageId: pageId, pageNumber: pageNum,
       width: sourcePage.width, height: sourcePage.height,
       layers: RenderingLayers(
@@ -8289,7 +8305,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         }).toList(),
       ),
       createdAt: now, modifiedAt: now,
-    );
+    ));
 
     final newEntry = PageEntry(pageId: pageId, pageNumber: pageNum, fileName: fileName, lastModified: now, chapterId: entry.chapterId);
 
@@ -8396,13 +8412,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final fileName = s.currentPageFileName;
     final undoStack = _pushUndo(s, fileName, page);
 
-    final clearedPage = PageData(
+    final clearedPage = carryPdfTextLayer(page, PageData(
       pageId: page.pageId, pageNumber: page.pageNumber,
       width: page.width, height: page.height,
       layers: RenderingLayers(background: page.layers.background, content: const []),
       assetReferences: page.assetReferences,
       createdAt: page.createdAt, modifiedAt: DateTime.now(),
-    );
+    ));
 
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[fileName] = clearedPage;
