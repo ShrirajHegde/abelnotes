@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:abelnotes/features/import/data/import_models.dart';
 import 'package:abelnotes/features/import/data/import_service.dart';
 import 'package:abelnotes/features/import/data/onenote_importer.dart';
 import 'package:abelnotes/shared/models/ncnote_format.dart';
@@ -158,7 +159,10 @@ void main() {
     expect(strokes[1].isHighlighter, isTrue);
 
     // The skipped counter surfaces as a report issue.
-    expect(parsed.issues.any((i) => i.message.contains('1 elementi')), isTrue);
+    expect(
+        parsed.issues.any((i) =>
+            i.code == ImportIssueCode.oneNoteElementsSkipped && i.count == 1),
+        isTrue);
   });
 
   test('importOneNote assembly: infinite pages, chapters, asset filtering',
@@ -173,10 +177,10 @@ void main() {
         contains('quaderno_id123'));
   });
 
-  test('empty tree throws FormatException', () async {
+  test('empty tree throws ImportException', () async {
     expect(
       () => OneNoteImporter().fromTree({'sections': []}, title: 'x'),
-      throwsFormatException,
+      throwsA(isA<ImportException>()),
     );
   });
 }

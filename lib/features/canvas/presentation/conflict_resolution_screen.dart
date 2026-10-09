@@ -445,6 +445,7 @@ class _DiffSummaryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final localCounts = _countElements(conflict.localPage);
     final remoteCounts = _countElements(conflict.remotePage);
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -452,13 +453,13 @@ class _DiffSummaryBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _DiffChip(Icons.gesture, 'Tratti', localCounts.strokes, remoteCounts.strokes),
+          _DiffChip(Icons.gesture, l10n.quDiffStrokes, localCounts.strokes, remoteCounts.strokes),
           const SizedBox(width: 16),
-          _DiffChip(Icons.image_outlined, 'Immagini', localCounts.images, remoteCounts.images),
+          _DiffChip(Icons.image_outlined, l10n.quDiffImages, localCounts.images, remoteCounts.images),
           const SizedBox(width: 16),
-          _DiffChip(Icons.crop_square, 'Forme', localCounts.shapes, remoteCounts.shapes),
+          _DiffChip(Icons.crop_square, l10n.quDiffShapes, localCounts.shapes, remoteCounts.shapes),
           const SizedBox(width: 16),
-          _DiffChip(Icons.text_fields, 'Testi', localCounts.texts, remoteCounts.texts),
+          _DiffChip(Icons.text_fields, l10n.quDiffTexts, localCounts.texts, remoteCounts.texts),
         ],
       ),
     );

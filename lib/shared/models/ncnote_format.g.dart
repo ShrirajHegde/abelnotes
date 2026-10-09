@@ -406,6 +406,8 @@ _$ImageDataImpl _$$ImageDataImplFromJson(Map<String, dynamic> json) =>
       locked: json['locked'] as bool? ?? false,
       flipHorizontal: json['flipHorizontal'] as bool? ?? false,
       comment: json['comment'] as String?,
+      pdfWidthPt: (json['pdfWidthPt'] as num?)?.toDouble(),
+      pdfHeightPt: (json['pdfHeightPt'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$$ImageDataImplToJson(_$ImageDataImpl instance) =>
@@ -420,6 +422,8 @@ Map<String, dynamic> _$$ImageDataImplToJson(_$ImageDataImpl instance) =>
       'locked': instance.locked,
       'flipHorizontal': instance.flipHorizontal,
       'comment': instance.comment,
+      'pdfWidthPt': instance.pdfWidthPt,
+      'pdfHeightPt': instance.pdfHeightPt,
     };
 
 _$ShapeDataImpl _$$ShapeDataImplFromJson(Map<String, dynamic> json) =>

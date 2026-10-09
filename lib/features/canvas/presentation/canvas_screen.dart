@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' as io;
 import 'package:abelnotes/config/app_config.dart';
 import 'package:abelnotes/core/services/desktop_window.dart';
@@ -9,8 +8,6 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:pdf/pdf.dart' as pw_pdf;
-import 'package:pdf/widgets.dart' as pw;
 import 'package:pdfrx/pdfrx.dart' as pdfrx;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -18,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
+import 'package:abelnotes/shared/utils/chapter_title.dart';
 import 'package:abelnotes/core/providers/app_settings_provider.dart';
 import 'package:abelnotes/core/providers/auth_provider.dart'
     show webdavServiceProvider, nextcloudShareServiceProvider;
@@ -28,7 +26,10 @@ import 'package:abelnotes/core/providers/preset_colors_provider.dart';
 import 'package:abelnotes/core/services/sync_service.dart' as sync_svc;
 import 'package:abelnotes/features/canvas/data/render_engine.dart';
 import 'package:abelnotes/features/canvas/data/math_rasterizer.dart';
+import 'package:abelnotes/features/canvas/data/pdf_export.dart';
+import 'package:abelnotes/features/canvas/data/pdf_import_support.dart';
 import 'package:abelnotes/features/canvas/data/pdf_text_extractor.dart';
+import 'package:abelnotes/features/canvas/presentation/pdf_password_dialog.dart';
 import 'package:abelnotes/features/canvas/presentation/pdf_text_selection.dart';
 import 'package:abelnotes/shared/utils/rich_paste.dart';
 import 'package:abelnotes/features/canvas/presentation/image_handle_overlay.dart';
@@ -420,6 +421,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
   // has no extracted text. Lives in page-logical coords so zoom/pan don't
   // invalidate a selection.
   PdfTextSelectionController? _pdfTextSelController;
+  ScaffoldMessengerState? _hintMessenger;
   PdfTextLayer? _pdfTextSelLayer;
   /// True while a device-aware text-selection drag is in progress (mouse over
   /// text). Gates the move/up handlers so the drag is independent of the tool.
@@ -448,6 +450,63 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     CanvasTool.calligraphy,
     CanvasTool.highlighter,
   };
+
+  bool _mouseDrawHintShown = false;
+  DateTime _lastMouseClickTime = DateTime.fromMillisecondsSinceEpoch(0);
+  Offset _lastMouseClickPos = Offset.zero;
+
+  /// Mouse counterpart of the touch/trackpad double-tap zoom toggle (the
+  /// scale recognizer deliberately excludes the mouse).
+  void _mouseDoubleClickZoom(PointerDownEvent e, CanvasState live) {
+    if (e.kind != PointerDeviceKind.mouse ||
+        e.buttons != kPrimaryMouseButton ||
+        (live.currentTool != CanvasTool.pan &&
+            live.currentTool != CanvasTool.image)) {
+      return;
+    }
+    final now = DateTime.now();
+    final isDouble = now.difference(_lastMouseClickTime).inMilliseconds < 400 &&
+        (e.localPosition - _lastMouseClickPos).distance < 30;
+    _lastMouseClickTime = isDouble ? DateTime.fromMillisecondsSinceEpoch(0) : now;
+    _lastMouseClickPos = e.localPosition;
+    if (!isDouble) return;
+    final notifier = ref.read(canvasProvider.notifier);
+    if (live.zoom < 1.4) {
+      notifier.resetZoom();
+    } else {
+      notifier.zoomToFit();
+    }
+  }
+
+  void _maybeHintMouseDraw(List<Offset> marquee) {
+    final live = ref.read(canvasProvider);
+    if (_mouseDrawHintShown ||
+        live == null ||
+        !_mouseSelectTools.contains(live.currentTool) ||
+        ref.read(appSettingsProvider).mouseDraws) {
+      return;
+    }
+    var length = 0.0;
+    for (var i = 1; i < marquee.length; i++) {
+      length += (marquee[i] - marquee[i - 1]).distance;
+    }
+    if (length < 40) return;
+    _mouseDrawHintShown = true;
+    final l10n = AppLocalizations.of(context);
+    final messenger = _hintMessenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(l10n.qcMouseSelectHint),
+        persist: false,
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: l10n.qcMouseDrawEnable,
+          onPressed: () =>
+              ref.read(appSettingsProvider.notifier).setMouseDraws(true),
+        ),
+      ));
+  }
 
   /// A dock button was tapped by [kind]. The dock is part of the canvas as
   /// far as "which device is in the user's hand" goes: without this, hovering
@@ -1224,6 +1283,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
 
   @override
   void dispose() {
+    _hintMessenger?.hideCurrentSnackBar();
     WidgetsBinding.instance.removeObserver(this);
     PenInputChannel.unregister();
     LinuxPenPressure.unregister();
@@ -1467,8 +1527,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       switch (event.logicalKey) {
         case LogicalKeyboardKey.digit0:
         case LogicalKeyboardKey.numpad0:
-          // Ctrl+0 = re-frame on content (scratch mode; no-op elsewhere).
-          ref.read(canvasProvider.notifier).fitToContent();
+          ref.read(canvasProvider.notifier).resetZoom();
           return KeyEventResult.handled;
         case LogicalKeyboardKey.keyZ:
           if (shift) {
@@ -1538,9 +1597,6 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
           return KeyEventResult.handled;
         case LogicalKeyboardKey.keyA:
           ref.read(canvasProvider.notifier).selectAll();
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.digit0:
-          ref.read(canvasProvider.notifier).resetZoom();
           return KeyEventResult.handled;
         default:
           break;
@@ -2646,6 +2702,13 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       }
     }
 
+    // Starting any pen/eraser/shape gesture dismisses a PDF text selection.
+    if (tool != CanvasTool.lasso &&
+        tool != CanvasTool.pan &&
+        tool != CanvasTool.text) {
+      _ensurePdfTextSel(state)?.clear();
+    }
+
     // Eraser: only erase, don't start a stroke visual
     if (tool == CanvasTool.eraserStandard || tool == CanvasTool.eraserStroke) {
       ref.read(canvasProvider.notifier).startStroke(pagePos, pressure);
@@ -2974,6 +3037,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         final pts = List<Offset>.from(_lassoPathNotifier.points);
         _lassoPathNotifier.clear();
         ref.read(canvasProvider.notifier).commitLassoPath(pts);
+        _maybeHintMouseDraw(pts);
       }
       return;
     }
@@ -3292,6 +3356,14 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
   static double _distToShapeOutline(ShapeData sh, Offset p) {
     // Undo the shape's rotation on the probe point so all the outline
     // math below can stay axis-aligned.
+    if (sh.shapeType == 'triangle') {
+      final tc = triangleCorners(sh);
+      return [
+        _distToSegment(p, tc[0], tc[1]),
+        _distToSegment(p, tc[1], tc[2]),
+        _distToSegment(p, tc[2], tc[0]),
+      ].reduce(min);
+    }
     var q = p;
     if (sh.rotation != 0) {
       final cx = (sh.x1 + sh.x2) / 2, cy = (sh.y1 + sh.y2) / 2;
@@ -3958,33 +4030,52 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     );
   }
 
-  /// Estimate the number of pages in a PDF from its raw bytes.
-  /// Searches for /Type /Page (not /Pages) entries in the byte stream.
-  int _countPdfPages(Uint8List bytes) {
-    try {
-      final str = latin1.decode(bytes, allowInvalid: true);
-      return RegExp(r'/Type\s*/Page[^s]').allMatches(str).length;
-    } catch (_) {
-      return 0;
-    }
-  }
+  /// User-facing text for a PDF that could not be opened.
+  String _pdfOpenErrorText(AppLocalizations l10n, PdfOpenFailure f) =>
+      switch (f) {
+        PdfOpenFailure.notPdf => l10n.qiPdfNotPdf,
+        PdfOpenFailure.corrupt => l10n.qiPdfCorrupt,
+        PdfOpenFailure.empty => l10n.qiPdfEmpty,
+        PdfOpenFailure.unsupported => l10n.qiPdfUnsupported,
+        PdfOpenFailure.passwordCancelled => l10n.qiPdfPasswordCancelled,
+      };
 
   Future<void> _insertPdf(Uint8List bytes, String name, Offset pagePos) async {
     if (!mounted) return;
 
-    // Estimate page count for pre-confirmation
-    final estimated = _countPdfPages(bytes);
+    // Open first: an unreadable file must fail before the options dialog.
+    final pdfrx.PdfDocument doc;
+    try {
+      doc = await openPdfForImport(
+        bytes,
+        askPassword: (wrong) async =>
+            mounted ? showPdfPasswordDialog(context, wrong: wrong) : null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      debugPrint('[Canvas] PDF open failed: $e');
+      final msg = e is PdfOpenException
+          ? _pdfOpenErrorText(l10n, e.failure)
+          : l10n.qiPdfImportFailed;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    }
+
+    final estimated = doc.pages.length;
 
     // Always offer page-range selection (even for short PDFs) so the user
     // can import just the chunk they care about. The dialog falls back to
     // "all" by default so single-tap imports stay quick.
     final range = await _askPdfImportRange(estimated);
-    if (range == null) return;
+    if (range == null || !mounted) {
+      await doc.dispose();
+      return;
+    }
     // 1-based inclusive bounds; null = unbounded on that side.
     final int? rangeStart = range.start;
     final int? rangeEnd = range.end;
 
-    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context).csPdfRasterizing), duration: const Duration(seconds: 30)),
     );
@@ -3996,12 +4087,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     // one-time) and segfaults. One engine ⇒ one global PDFium state ⇒ no
     // conflict, and the raster + text come from the exact same page geometry.
     final notifier = ref.read(canvasProvider.notifier);
-    pdfrx.PdfDocument? doc;
     bool bulkStarted = false;
     try {
-      await pdfrx.pdfrxFlutterInitialize();
-      doc = await pdfrx.PdfDocument.openData(bytes);
-
       // Adaptive DPI: big PDFs render at lower resolution so the raw pixel
       // buffers don't blow the iOS jetsam limit. 150 DPI on A4 is ~8.7 MB/page
       // of RGBA; we render → encode → free ONE page at a time to stay bounded.
@@ -4014,6 +4101,9 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       notifier.beginBulkOperation();
       bulkStarted = true;
       int processed = 0;
+      final startPage = ref.read(canvasProvider)?.currentPage;
+      final startPageW = startPage?.width ?? 595.0;
+      final startPageH = startPage?.height ?? 842.0;
 
       for (int i = 0; i < pageCount; i++) {
         if (!mounted) return;
@@ -4026,8 +4116,12 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         final bool swap = page.rotation.index.isOdd;
         final double dispWpt = swap ? page.height : page.width;
         final double dispHpt = swap ? page.width : page.height;
-        final int fullW = (dispWpt * dpi / 72.0).round().clamp(1, 12000);
-        final int fullH = (dispHpt * dpi / 72.0).round().clamp(1, 12000);
+        // The notebook page takes the source page's shape; the raster is
+        // sized from that logical size so every page costs about the same.
+        final logical = pdfPageLogicalSize(dispWpt, dispHpt,
+            refW: startPageW, refH: startPageH);
+        final int fullW = (logical.w * dpi / 72.0).round().clamp(1, 12000);
+        final int fullH = (logical.h * dpi / 72.0).round().clamp(1, 12000);
 
         final pdfImg = await page.render(
           fullWidth: fullW.toDouble(),
@@ -4039,8 +4133,6 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
           return;
         }
         if (pdfImg == null) continue;
-        final int rasterW = pdfImg.width;
-        final int rasterH = pdfImg.height;
         // Encode to PNG (lossless, matches the prior import output). The native
         // BGRA buffer + ui.Image are freed before the next page is rendered.
         final assetBytes = await _pdfImageToPng(pdfImg);
@@ -4060,14 +4152,14 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         // the user can navigate to another page during a long import.
         final st = ref.read(canvasProvider);
         final targetPageFileName = st?.currentPageFileName;
-        final pageW = st?.currentPage?.width ?? 595.0;
-        final pageH = st?.currentPage?.height ?? 842.0;
-        double imgW = rasterW.toDouble();
-        double imgH = rasterH.toDouble();
-        final scaleToFit = min(pageW / imgW, pageH / imgH);
-        imgW *= scaleToFit;
-        imgH *= scaleToFit;
-        final insertPos = Offset((pageW - imgW) / 2, (pageH - imgH) / 2);
+        if (targetPageFileName != null &&
+            (st?.currentPage?.width != logical.w ||
+                st?.currentPage?.height != logical.h)) {
+          notifier.setPageGeometry(targetPageFileName, logical.w, logical.h);
+        }
+        final imgW = logical.w;
+        final imgH = logical.h;
+        const insertPos = Offset.zero;
         final assetId = notifier.addImageElement(
           insertPos,
           '${name}_p${processed + 1}.png',
@@ -4075,6 +4167,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
           imgW,
           imgH,
           locked: true,
+          pdfSizePt: (w: dispWpt, h: dispHpt),
         );
 
         // Overlay the page's embedded text (selectable + searchable). Same
@@ -4139,16 +4232,17 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       }
     } catch (e) {
       if (bulkStarted) notifier.endBulkOperation();
+      debugPrint('[Canvas] PDF import failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).csPdfImportError(e.toString()))),
+          SnackBar(content: Text(AppLocalizations.of(context).qiPdfImportFailed)),
         );
       }
     } finally {
       // Release PDFium's parse of the source PDF. Runs on every exit path
       // (including the `if (!mounted) return` guards inside the loop).
-      await doc?.dispose();
+      await doc.dispose();
     }
   }
 
@@ -4246,8 +4340,10 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         // refs). Lists are replaced on every push/pop, so the chrome
         // rebuilt for every stroke commit just to enable the same icons.
         // Booleans only trip the select on actual empty↔non-empty transitions.
-        canUndo: s.undoStack.isNotEmpty,
-        canRedo: s.redoStack.isNotEmpty,
+        canUndo: s.document.pages.isNotEmpty &&
+            s.undoStack.any((e) => e.pageFileName == s.currentPageFileName),
+        canRedo: s.document.pages.isNotEmpty &&
+            s.redoStack.any((e) => e.pageFileName == s.currentPageFileName),
         symbolLibraries: s.symbolLibraries,
         // Placement banners ("Tocca per posizionare…"): without these the
         // X button's cancelPendingPaste/clearPendingSymbol changed ONLY
@@ -4516,9 +4612,11 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
             // Cache the live editor area so the dock drag handlers can
             // compute edge-snap zones and clamp the floating offset.
             _dockArea = constraints.biggest;
+            final dockTool =
+                _dockDisplayTool(canvasState, appSettings.mouseDraws);
             final dockWidget = HwFloatingDock(
               key: _dockKey,
-              currentTool: _dockDisplayTool(canvasState, appSettings.mouseDraws),
+              currentTool: dockTool,
               penDeviceTool: canvasState.currentTool,
               activeInkColor: activeColor,
               lastEraserMode: notifier.lastEraserMode,
@@ -4535,7 +4633,18 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                 if (_popupOpen) setState(() => _popupOpen = false);
               },
               onActiveTap: (kind) {
+                // Dock still shows the real pen while the mouse only selects
+                // (not yet seen over the canvas): a mouse tap on it means
+                // "draw with the mouse", not "open the popup".
+                final penShown = dockTool == canvasState.currentTool &&
+                    _mouseSelectTools.contains(canvasState.currentTool);
                 _noteDockTapDevice(kind);
+                if (kind == PointerDeviceKind.mouse &&
+                    penShown &&
+                    !appSettings.mouseDraws) {
+                  ref.read(appSettingsProvider.notifier).setMouseDraws(true);
+                  return;
+                }
                 setState(() => _popupOpen = !_popupOpen);
               },
               position: dockPosition,
@@ -4944,6 +5053,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                       _showContextMenu(e.position, e.localPosition, live, canvasSize);
                       return;
                     }
+                    _mouseDoubleClickZoom(e, live);
                     _onPointerDown(e, live, canvasSize);
                   },
                   onPointerMove: (e) {
@@ -6106,7 +6216,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -6162,7 +6272,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
               ),
             ],
           ),
-        ),
+        )),
       ),
     );
     if (picked != null) {
@@ -6214,7 +6324,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -6253,7 +6363,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                 ),
               ],
             ),
-          ),
+          )),
         ),
       ),
     );
@@ -6271,7 +6381,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
@@ -6320,7 +6430,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                 },
               ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -6756,7 +6866,9 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     );
     controller.dispose();
     if (result != null && result.$1.isNotEmpty) {
-      ref.read(canvasProvider.notifier).createSymbolFromSelection(result.$1, targetLibId: result.$2);
+      ref.read(canvasProvider.notifier).createSymbolFromSelection(result.$1,
+          targetLibId: result.$2,
+          defaultLibraryName: l10n.chromeSymbols);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.csSymbolCreated(result.$1)), duration: const Duration(seconds: 2)),
@@ -6813,7 +6925,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     );
     controller.dispose();
     if (result != null && result.$1.isNotEmpty) {
-      ref.read(canvasProvider.notifier).createSymbolFromElement(elementId, result.$1);
+      ref.read(canvasProvider.notifier).createSymbolFromElement(elementId, result.$1,
+          defaultLibraryName: l10n.chromeSymbols);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.csSymbolCreated(result.$1)), duration: const Duration(seconds: 2)),
@@ -6837,8 +6950,39 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
 
   // ── Export ──
 
+  /// One page for the PDF writer: the imported PDF raster itself plus a
+  /// transparent annotation overlay when possible (no second rasterisation),
+  /// otherwise a flat render; PDF text stays as an invisible layer.
+  Future<PdfExportPage?> _pdfExportPage(
+      PageData page, Map<String, ui.Image> imageCache) async {
+    final runs = pdfExportRuns(page);
+    final size = pdfExportPageSize(page);
+    final scale = exportScaleFor(page.width, page.height);
+    final split = splitPdfBackground(page);
+    final base = split == null
+        ? null
+        : ref.read(canvasProvider)?.assetBytes[split.assetPath];
+    if (split != null && base != null) {
+      Uint8List? overlay;
+      if (split.overlayPage != null) {
+        overlay = await _renderPageToPng(split.overlayPage!, imageCache,
+            scale: scale, transparent: true);
+      }
+      return PdfExportPage(
+          width: size.width,
+          height: size.height,
+          baseImage: base,
+          overlayPng: overlay,
+          runs: runs);
+    }
+    final flat = await _renderPageToPng(page, imageCache, scale: scale);
+    if (flat == null) return null;
+    return PdfExportPage(
+        width: size.width, height: size.height, flatPng: flat, runs: runs);
+  }
+
   /// Render a single page to a PNG [Uint8List] at the given [scale].
-  Future<Uint8List?> _renderPageToPng(PageData page, Map<String, ui.Image> imageCache, {double scale = 2.0}) async {
+  Future<Uint8List?> _renderPageToPng(PageData page, Map<String, ui.Image> imageCache, {double scale = 2.0, bool transparent = false}) async {
     final w = page.width;
     final h = page.height;
     final renderW = (w * scale).round();
@@ -6897,7 +7041,9 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w * scale, h * scale));
       canvas.scale(scale);
-      canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = Colors.white);
+      if (!transparent) {
+        canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = Colors.white);
+      }
 
       final engine = CanvasRenderEngine(
         pageData: page,
@@ -6965,7 +7111,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     final base = _sanitiseForFilename(state.metadata.title);
     switch (scope) {
       case _ExportScope.currentPage:
-        return '$base - pag. ${state.currentPageIndex + 1}.$extension';
+        return '$base - ${AppLocalizations.of(context).csPageNumber(state.currentPageIndex + 1)}.$extension';
       case _ExportScope.currentChapter:
         final ch = _resolveActiveChapter(state);
         if (ch != null && ch.title.trim().isNotEmpty) {
@@ -7155,7 +7301,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
 
     // Build the actual page list. For "entireNotebook + chapterSeparators"
     // we interleave a synthetic separator page before every chapter group.
-    final pagePayload = <_PdfPagePayload>[];
+    final pagePayload = <PdfExportPage>[];
     const scale = 2.0;
     int pageCountForSnack = 0;
 
@@ -7180,22 +7326,17 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
             final sepPng =
                 await _renderChapterSeparatorPng(group.chapterTitle!, w, h, scale);
             if (sepPng != null) {
-              pagePayload.add(_PdfPagePayload(
+              pagePayload.add(PdfExportPage(
                 width: w,
                 height: h,
-                pngBytes: sepPng,
+                flatPng: sepPng,
               ));
             }
           }
           for (final page in group.pages) {
-            final pngBytes =
-                await _renderPageToPng(page, state.imageCache, scale: scale);
-            if (pngBytes == null) continue;
-            pagePayload.add(_PdfPagePayload(
-              width: page.width,
-              height: page.height,
-              pngBytes: pngBytes,
-            ));
+            final exported = await _pdfExportPage(page, state.imageCache);
+            if (exported == null) continue;
+            pagePayload.add(exported);
           }
         }
         if (pagePayload.isEmpty) return;
@@ -7219,20 +7360,16 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       }
 
       for (final page in pages) {
-        final pngBytes = await _renderPageToPng(page, state.imageCache, scale: scale);
-        if (pngBytes == null) continue;
-        pagePayload.add(_PdfPagePayload(
-          width: page.width,
-          height: page.height,
-          pngBytes: pngBytes,
-        ));
+        final exported = await _pdfExportPage(page, state.imageCache);
+        if (exported == null) continue;
+        pagePayload.add(exported);
       }
       if (pagePayload.isEmpty) return;
     }
 
     try {
 
-      final pdfBytes = await compute(_buildPdfOnIsolate, pagePayload);
+      final pdfBytes = await compute(buildPdfDocument, pagePayload);
       final fileName = _exportFilename(state, selection.scope, 'pdf');
       await _saveOrShare(fileName, pdfBytes, 'application/pdf');
 
@@ -7255,24 +7392,18 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
   /// renderable pages. Mirrors [_exportAsPdf]'s entire-notebook (no chapter
   /// separators) path, off-isolate for the actual document assembly.
   Future<Uint8List?> _buildNotebookPdfBytes(CanvasState state) async {
-    const scale = 2.0;
     final pages = state.document.pages
         .map((e) => state.pages[e.fileName])
         .whereType<PageData>()
         .toList();
     if (pages.isEmpty) return null;
-    final payload = <_PdfPagePayload>[];
+    final payload = <PdfExportPage>[];
     for (final page in pages) {
-      final png = await _renderPageToPng(page, state.imageCache, scale: scale);
-      if (png == null) continue;
-      payload.add(_PdfPagePayload(
-        width: page.width,
-        height: page.height,
-        pngBytes: png,
-      ));
+      final exported = await _pdfExportPage(page, state.imageCache);
+      if (exported != null) payload.add(exported);
     }
     if (payload.isEmpty) return null;
-    return compute(_buildPdfOnIsolate, payload);
+    return compute(buildPdfDocument, payload);
   }
 
   /// Uploads a PDF render of the notebook to the user's Nextcloud and shows
@@ -7762,7 +7893,9 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         if (!mounted) return null;
         final range = await _promptPageRange(
           title: l10n.csExportChapterTitle,
-          subtitle: chapter?.title ?? l10n.csExportCurrentChapter,
+          subtitle: chapter == null
+              ? l10n.csExportCurrentChapter
+              : chapterDisplayTitle(l10n, chapter.title),
           totalPages: chPagesCount,
         );
         if (range == null) return null;
@@ -7904,7 +8037,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     final ch = _resolveActiveChapter(state);
     if (ch == null) return '';
     final count = _chapterPageEntries(state, ch).length;
-    return AppLocalizations.of(context).csChapterLabelWithCount(ch.title, count);
+    return AppLocalizations.of(context).csChapterLabelWithCount(
+        chapterDisplayTitle(AppLocalizations.of(context), ch.title), count);
   }
 
   /// Right-click / long-press on a thumbnail in the bottom strip.
@@ -8042,7 +8176,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
@@ -8076,7 +8210,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
               },
             ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -8170,7 +8304,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
@@ -8246,7 +8380,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                 },
               ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -8260,7 +8394,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
@@ -8284,7 +8418,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                 },
               ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -8311,7 +8445,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     try {
       monitors = await service.listMonitors();
     } catch (e) {
-      if (mounted) _toast('$e');
+      if (mounted) _toast(_penMonitorErrorText(e));
       return;
     }
     if (!mounted) return;
@@ -8323,7 +8457,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
@@ -8341,7 +8475,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                     await service.mapPenToMonitor(m, monitors);
                     if (mounted) _toast(l10n.csPenMappedTo(m.name));
                   } catch (e) {
-                    if (mounted) _toast('$e');
+                    if (mounted) _toast(_penMonitorErrorText(e));
                   }
                 },
               ),
@@ -8356,14 +8490,26 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                   await service.resetPen();
                   if (mounted) _toast(l10n.csPenReset);
                 } catch (e) {
-                  if (mounted) _toast('$e');
+                  if (mounted) _toast(_penMonitorErrorText(e));
                 }
               },
             ),
           ],
-        ),
+        )),
       ),
     );
+  }
+
+  String _penMonitorErrorText(Object e) {
+    final l10n = AppLocalizations.of(context);
+    if (e is! PenMonitorException) return l10n.csErrorGeneric('$e');
+    return switch (e.error) {
+      PenMonitorError.toolMissing => l10n.quPenToolMissing(e.tool ?? ''),
+      PenMonitorError.toolFailed => l10n.quPenToolFailed(e.tool ?? ''),
+      PenMonitorError.noMonitor => l10n.quPenNoMonitor,
+      PenMonitorError.noPen => l10n.quPenNoDevice,
+      PenMonitorError.badGeometry => l10n.quPenBadGeometry,
+    };
   }
 
   String _toolTypeString(CanvasTool tool) {
@@ -8535,45 +8681,6 @@ class _ShortcutGroup extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  PDF export — isolate payload
-// ═══════════════════════════════════════════════════════════════
-
-/// Payload passed to the background isolate that assembles the PDF.
-///
-/// Kept intentionally simple (only primitives + Uint8List) so it serializes
-/// cleanly across the isolate boundary.
-class _PdfPagePayload {
-  final double width;
-  final double height;
-  final Uint8List pngBytes;
-  const _PdfPagePayload({
-    required this.width,
-    required this.height,
-    required this.pngBytes,
-  });
-}
-
-/// Top-level entry point for [compute]: builds a PDF document from the
-/// pre-rendered PNGs and returns the encoded bytes. Runs off the UI isolate.
-Future<Uint8List> _buildPdfOnIsolate(List<_PdfPagePayload> payloads) async {
-  final doc = pw.Document();
-  for (final p in payloads) {
-    final img = pw.MemoryImage(p.pngBytes);
-    doc.addPage(
-      pw.Page(
-        pageFormat: pw_pdf.PdfPageFormat(
-          p.width * pw_pdf.PdfPageFormat.point,
-          p.height * pw_pdf.PdfPageFormat.point,
-        ),
-        margin: pw.EdgeInsets.zero,
-        build: (ctx) => pw.Image(img, fit: pw.BoxFit.fill),
-      ),
-    );
-  }
-  return Uint8List.fromList(await doc.save());
-}
-
 /// Identifies which side button of the pen triggered the native
 /// barrel override. Mirrors the two `penFlags` bits the C++ runner
 /// reads — see `PenInputChannel` doc comment.
@@ -8638,7 +8745,7 @@ class _PdfRangeDialogState extends State<_PdfRangeDialog> {
     }
     if (widget.estimatedPages > 0 && start > widget.estimatedPages) {
       setState(() => _error =
-          l10n.csPdfStartOutOfRange(widget.estimatedPages));
+          l10n.qiPdfStartOutOfRange(widget.estimatedPages));
       return;
     }
     final clampedEnd =
@@ -8661,7 +8768,7 @@ class _PdfRangeDialogState extends State<_PdfRangeDialog> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                l10n.csPdfEstimatedPages(est),
+                l10n.qiPdfPageCount(est),
                 style: TextStyle(color: p.ink2),
               ),
             ),

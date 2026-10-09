@@ -17,6 +17,7 @@ import 'package:abelnotes/core/services/file_open_receiver.dart';
 import 'package:abelnotes/core/services/file_service.dart';
 import 'package:abelnotes/core/services/thumbnail_service.dart';
 import 'package:abelnotes/features/onboarding/onboarding_screen.dart';
+import 'package:abelnotes/features/sync/sync_notices.dart';
 import 'package:abelnotes/ui/screens/library_screen.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -82,6 +83,7 @@ class AbelNotesApp extends ConsumerWidget {
     };
     return MaterialApp(
       title: 'AbelNotes',
+      navigatorKey: syncNavigatorKey,
       debugShowCheckedModeBanner: false,
       // Locale di sistema (o override da Impostazioni > Lingua);
       // fallback inglese se non supportata.
@@ -113,7 +115,7 @@ class AbelNotesApp extends ConsumerWidget {
         return HwThemeScope(
           palette: palette,
           variant: variant,
-          child: child ?? const SizedBox.shrink(),
+          child: ReauthBannerHost(child: child ?? const SizedBox.shrink()),
         );
       },
     );

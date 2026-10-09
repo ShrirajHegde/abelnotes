@@ -5,6 +5,7 @@ import 'package:abelnotes/core/services/file_service.dart';
 import 'package:abelnotes/core/services/pending_root_uploads.dart';
 import 'package:abelnotes/core/services/sync_service.dart';
 import 'package:abelnotes/features/import/data/block_paginator.dart';
+import 'package:abelnotes/features/import/data/import_limits.dart';
 import 'package:abelnotes/features/import/data/import_models.dart';
 import 'package:abelnotes/features/import/data/onenote_importer.dart';
 import 'package:abelnotes/shared/models/ncnote_format.dart';
@@ -100,7 +101,7 @@ class ImportService {
       notebookId: assembled.metadata.id,
       chapterCount: assembled.metadata.chapters.length,
       pageCount: assembled.pages.length,
-      issues: draft.issues,
+      issues: [...draft.issues, ...assembled.issues],
     );
   }
 
@@ -211,6 +212,7 @@ class ImportService {
     final chapters = <Chapter>[];
     final pageEntries = <PageEntry>[];
     final pages = <String, PageData>{};
+    final truncatedIssues = <ImportIssue>[];
     var pageNumber = 1;
 
     for (var i = 0; i < draft.chapters.length; i++) {
@@ -220,10 +222,29 @@ class ImportService {
         current: i,
         total: draft.chapters.length,
         detail: ch.title,
+        fraction: i / draft.chapters.length,
       ));
-      final draftPages =
-          await paginator.paginate(ch.blocks, isCancelled: isCancelled);
+      final draftPages = await paginator.paginate(
+        ch.blocks,
+        isCancelled: isCancelled,
+        maxPages: ImportLimits.maxPagesPerNote,
+        onProgress: (done, total) => onProgress?.call(ImportProgress(
+          phase: ImportPhase.paginating,
+          current: i,
+          total: draft.chapters.length,
+          detail: ch.title,
+          fraction: (i + (total == 0 ? 1 : done / total)) /
+              draft.chapters.length,
+        )),
+      );
       if (isCancelled?.call() ?? false) return null;
+      if (paginator.truncated) {
+        truncatedIssues.add(ImportIssue(
+          source: ch.sourceName ?? ch.title,
+          code: ImportIssueCode.pagesTruncated,
+          count: ImportLimits.maxPagesPerNote,
+        ));
+      }
 
       final chapterId = uuid.v4();
       final pageIds = <String>[];
@@ -288,6 +309,7 @@ class ImportService {
       document: document,
       pages: pages,
       assets: assets,
+      issues: truncatedIssues,
     );
   }
 }
@@ -299,10 +321,14 @@ class AssembledNotebook {
   final Map<String, PageData> pages;
   final Map<String, Uint8List> assets;
 
+  /// Problems found while paginating (e.g. a note cut at the page cap).
+  final List<ImportIssue> issues;
+
   const AssembledNotebook({
     required this.metadata,
     required this.document,
     required this.pages,
     required this.assets,
+    this.issues = const [],
   });
 }

@@ -158,11 +158,21 @@ class PdfTextSelectionController extends ChangeNotifier {
     if (r == null) return '';
     final sb = StringBuffer();
     int? prevRun;
+    var atRunStart = false;
     for (var i = r.$1; i <= r.$2; i++) {
       final g = _glyphs[i];
       if (prevRun != null && g.runIndex != prevRun) {
-        sb.write(_separatorBetweenRuns(prevRun, g.runIndex));
+        // PDFium fragments often carry their own trailing/leading spaces or
+        // are whitespace-only; keep exactly one separator per boundary.
+        final joined = sb.toString().trimRight();
+        sb
+          ..clear()
+          ..write(joined)
+          ..write(_separatorBetweenRuns(prevRun, g.runIndex));
+        atRunStart = true;
       }
+      if (atRunStart && g.text.trim().isEmpty) continue;
+      atRunStart = false;
       sb.write(g.text);
       prevRun = g.runIndex;
     }

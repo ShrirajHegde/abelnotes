@@ -77,7 +77,7 @@ class _ImportProgressDialog extends StatelessWidget {
                     ],
                     const SizedBox(height: 16),
                     LinearProgressIndicator(
-                      value: determinate ? p.current / p.total : null,
+                      value: p.fraction ?? (determinate ? p.current / p.total : null),
                     ),
                     const SizedBox(height: 16),
                     Align(

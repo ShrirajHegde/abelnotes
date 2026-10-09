@@ -4813,6 +4813,10 @@ mixin _$ImageData {
   bool get flipHorizontal => throw _privateConstructorUsedError;
   String? get comment => throw _privateConstructorUsedError;
 
+  /// Source page size in PDF points, set on imported PDF page rasters.
+  double? get pdfWidthPt => throw _privateConstructorUsedError;
+  double? get pdfHeightPt => throw _privateConstructorUsedError;
+
   /// Serializes this ImageData to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -4838,7 +4842,9 @@ abstract class $ImageDataCopyWith<$Res> {
       double opacity,
       bool locked,
       bool flipHorizontal,
-      String? comment});
+      String? comment,
+      double? pdfWidthPt,
+      double? pdfHeightPt});
 }
 
 /// @nodoc
@@ -4866,6 +4872,8 @@ class _$ImageDataCopyWithImpl<$Res, $Val extends ImageData>
     Object? locked = null,
     Object? flipHorizontal = null,
     Object? comment = freezed,
+    Object? pdfWidthPt = freezed,
+    Object? pdfHeightPt = freezed,
   }) {
     return _then(_value.copyWith(
       x: null == x
@@ -4908,6 +4916,14 @@ class _$ImageDataCopyWithImpl<$Res, $Val extends ImageData>
           ? _value.comment
           : comment // ignore: cast_nullable_to_non_nullable
               as String?,
+      pdfWidthPt: freezed == pdfWidthPt
+          ? _value.pdfWidthPt
+          : pdfWidthPt // ignore: cast_nullable_to_non_nullable
+              as double?,
+      pdfHeightPt: freezed == pdfHeightPt
+          ? _value.pdfHeightPt
+          : pdfHeightPt // ignore: cast_nullable_to_non_nullable
+              as double?,
     ) as $Val);
   }
 }
@@ -4930,7 +4946,9 @@ abstract class _$$ImageDataImplCopyWith<$Res>
       double opacity,
       bool locked,
       bool flipHorizontal,
-      String? comment});
+      String? comment,
+      double? pdfWidthPt,
+      double? pdfHeightPt});
 }
 
 /// @nodoc
@@ -4956,6 +4974,8 @@ class __$$ImageDataImplCopyWithImpl<$Res>
     Object? locked = null,
     Object? flipHorizontal = null,
     Object? comment = freezed,
+    Object? pdfWidthPt = freezed,
+    Object? pdfHeightPt = freezed,
   }) {
     return _then(_$ImageDataImpl(
       x: null == x
@@ -4998,6 +5018,14 @@ class __$$ImageDataImplCopyWithImpl<$Res>
           ? _value.comment
           : comment // ignore: cast_nullable_to_non_nullable
               as String?,
+      pdfWidthPt: freezed == pdfWidthPt
+          ? _value.pdfWidthPt
+          : pdfWidthPt // ignore: cast_nullable_to_non_nullable
+              as double?,
+      pdfHeightPt: freezed == pdfHeightPt
+          ? _value.pdfHeightPt
+          : pdfHeightPt // ignore: cast_nullable_to_non_nullable
+              as double?,
     ));
   }
 }
@@ -5015,7 +5043,9 @@ class _$ImageDataImpl implements _ImageData {
       this.opacity = 1.0,
       this.locked = false,
       this.flipHorizontal = false,
-      this.comment});
+      this.comment,
+      this.pdfWidthPt,
+      this.pdfHeightPt});
 
   factory _$ImageDataImpl.fromJson(Map<String, dynamic> json) =>
       _$$ImageDataImplFromJson(json);
@@ -5047,9 +5077,15 @@ class _$ImageDataImpl implements _ImageData {
   @override
   final String? comment;
 
+  /// Source page size in PDF points, set on imported PDF page rasters.
+  @override
+  final double? pdfWidthPt;
+  @override
+  final double? pdfHeightPt;
+
   @override
   String toString() {
-    return 'ImageData(x: $x, y: $y, width: $width, height: $height, assetPath: $assetPath, rotation: $rotation, opacity: $opacity, locked: $locked, flipHorizontal: $flipHorizontal, comment: $comment)';
+    return 'ImageData(x: $x, y: $y, width: $width, height: $height, assetPath: $assetPath, rotation: $rotation, opacity: $opacity, locked: $locked, flipHorizontal: $flipHorizontal, comment: $comment, pdfWidthPt: $pdfWidthPt, pdfHeightPt: $pdfHeightPt)';
   }
 
   @override
@@ -5069,13 +5105,29 @@ class _$ImageDataImpl implements _ImageData {
             (identical(other.locked, locked) || other.locked == locked) &&
             (identical(other.flipHorizontal, flipHorizontal) ||
                 other.flipHorizontal == flipHorizontal) &&
-            (identical(other.comment, comment) || other.comment == comment));
+            (identical(other.comment, comment) || other.comment == comment) &&
+            (identical(other.pdfWidthPt, pdfWidthPt) ||
+                other.pdfWidthPt == pdfWidthPt) &&
+            (identical(other.pdfHeightPt, pdfHeightPt) ||
+                other.pdfHeightPt == pdfHeightPt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, x, y, width, height, assetPath,
-      rotation, opacity, locked, flipHorizontal, comment);
+  int get hashCode => Object.hash(
+      runtimeType,
+      x,
+      y,
+      width,
+      height,
+      assetPath,
+      rotation,
+      opacity,
+      locked,
+      flipHorizontal,
+      comment,
+      pdfWidthPt,
+      pdfHeightPt);
 
   /// Create a copy of ImageData
   /// with the given fields replaced by the non-null parameter values.
@@ -5104,7 +5156,9 @@ abstract class _ImageData implements ImageData {
       final double opacity,
       final bool locked,
       final bool flipHorizontal,
-      final String? comment}) = _$ImageDataImpl;
+      final String? comment,
+      final double? pdfWidthPt,
+      final double? pdfHeightPt}) = _$ImageDataImpl;
 
   factory _ImageData.fromJson(Map<String, dynamic> json) =
       _$ImageDataImpl.fromJson;
@@ -5129,6 +5183,12 @@ abstract class _ImageData implements ImageData {
   bool get flipHorizontal;
   @override
   String? get comment;
+
+  /// Source page size in PDF points, set on imported PDF page rasters.
+  @override
+  double? get pdfWidthPt;
+  @override
+  double? get pdfHeightPt;
 
   /// Create a copy of ImageData
   /// with the given fields replaced by the non-null parameter values.

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:abelnotes/core/services/file_service.dart';
 import 'package:abelnotes/core/services/sync_service.dart';
 import 'package:abelnotes/shared/models/ncnote_format.dart';
+import 'package:abelnotes/shared/utils/text_fold.dart';
 
 /// Full-text search across all locally-cached notebooks.
 ///
@@ -20,7 +21,7 @@ class SearchService {
   ///
   /// Returns at most [limit] hits, sorted by notebook title / page number.
   Future<List<SearchHit>> search(String query, {int limit = 200}) async {
-    final q = query.trim().toLowerCase();
+    final q = foldForSearch(query.trim());
     if (q.isEmpty) return const [];
 
     final rows = await fileService.getAllNotebookMeta();
@@ -29,7 +30,7 @@ class SearchService {
     for (final row in rows) {
       if (hits.length >= limit) break;
       final id = row['id'] as String;
-      final title = row['title'] as String? ?? 'Senza titolo';
+      final title = row['title'] as String? ?? '';
 
       final data = await fileService.readNotebookFile(id);
       if (data == null) continue;
@@ -38,7 +39,7 @@ class SearchService {
         final parsed = syncService.parseNcnoteMetadata(data);
 
         // ── Notebook title match ──
-        if (title.toLowerCase().contains(q)) {
+        if (foldForSearch(title).contains(q)) {
           hits.add(SearchHit(
             notebookId: id,
             notebookTitle: title,
@@ -53,7 +54,7 @@ class SearchService {
 
         // ── Chapter title matches ──
         for (final ch in parsed.metadata.chapters) {
-          if (ch.title.toLowerCase().contains(q)) {
+          if (foldForSearch(ch.title).contains(q)) {
             // Find the first page belonging to this chapter (if any).
             final pageEntry = parsed.document.pages.firstWhere(
               (p) => p.chapterId == ch.id,
@@ -87,7 +88,7 @@ class SearchService {
               orElse: () => null,
             );
             if (text == null || text.isEmpty) continue;
-            final lower = text.toLowerCase();
+            final lower = foldForSearch(text);
             final idx = lower.indexOf(q);
             if (idx < 0) continue;
             final start = (idx - 24).clamp(0, text.length);
@@ -112,7 +113,7 @@ class SearchService {
           final pdfLayer = page.pdfTextLayer;
           if (pdfLayer != null && hits.length < limit) {
             final text = pdfLayer.runs.map((r) => r.text).join(' ');
-            final lower = text.toLowerCase();
+            final lower = foldForSearch(text);
             final idx = lower.indexOf(q);
             if (idx >= 0) {
               final start = (idx - 24).clamp(0, text.length);

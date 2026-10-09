@@ -14,7 +14,7 @@ String sanitiseForFilename(String raw) {
   while (out.endsWith('.') || out.endsWith(' ')) {
     out = out.substring(0, out.length - 1).trimRight();
   }
-  return out.isEmpty ? 'Quaderno' : out;
+  return out.isEmpty ? 'AbelNotes' : out;
 }
 
 /// Write [data] wherever the user wants it. iOS/macOS go through the system

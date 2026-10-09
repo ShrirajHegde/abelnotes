@@ -127,7 +127,7 @@
       }
     }
   },
-  "csNoNotebookOpen": "Nessun notebook aperto",
+  "csNoNotebookOpen": "Nessun taccuino aperto",
   "@csNoNotebookOpen": {},
   "csMissingPageDataTitle": "Dati pagina mancanti",
   "@csMissingPageDataTitle": {},
@@ -927,7 +927,7 @@
   "@libCreate": {},
   "setSectionGeneral": "Generale",
   "@setSectionGeneral": {},
-  "setSectionInput": "Stylus & input",
+  "setSectionInput": "Stylus e input",
   "@setSectionInput": {},
   "setSectionSync": "Sincronia",
   "@setSectionSync": {},
@@ -965,7 +965,7 @@
   "@setStylusOnly": {},
   "setStylusOnlySub": "Ignora il tocco del dito durante la scrittura. Pinch e pan continuano a funzionare con due dita.",
   "@setStylusOnlySub": {},
-  "setPalmRejection": "Palm rejection",
+  "setPalmRejection": "Rifiuto del palmo",
   "@setPalmRejection": {},
   "setPalmRejectionSub": "Riconoscimento automatico del palmo appoggiato",
   "@setPalmRejectionSub": {},
@@ -973,7 +973,7 @@
   "@setPressureThickness": {},
   "setPressureThicknessSub": "Modulazione di tratto in base alla pressione dello stylus",
   "@setPressureThicknessSub": {},
-  "setTiltCalligraphy": "Tilt → calligrafia",
+  "setTiltCalligraphy": "Inclinazione → calligrafia",
   "@setTiltCalligraphy": {},
   "setTiltCalligraphySub": "L'inclinazione dello stylus altera larghezza e angolo del tratto",
   "@setTiltCalligraphySub": {},
@@ -1067,7 +1067,7 @@
   "@setShortcutSave": {},
   "setShortcutFit": "Adatta",
   "@setShortcutFit": {},
-  "setShortcutCheatSheet": "Cheat sheet",
+  "setShortcutCheatSheet": "Promemoria",
   "@setShortcutCheatSheet": {},
   "setKeyboardShortcutsTitle": "Scorciatoie da tastiera",
   "@setKeyboardShortcutsTitle": {},
@@ -1131,14 +1131,6 @@
   "@setTrashEmpty": {},
   "setTrashEmptyState": "Il cestino è vuoto.",
   "@setTrashEmptyState": {},
-  "setTrashDeletedAgo": "Eliminato {time} fa",
-  "@setTrashDeletedAgo": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
   "setTrashRestore": "Ripristina",
   "@setTrashRestore": {},
   "setAdvancedIntro": "Strumenti di recupero per casi rari di taccuino bloccato in sincronia. Usali solo se il sync continua a fallire dopo un normale \"Forza sync\" dalla libreria.",
@@ -1411,9 +1403,9 @@
   "@logServerUrlRequired": {},
   "logServerUrlInvalid": "Deve iniziare con http:// o https://",
   "@logServerUrlInvalid": {},
-  "logUsernameLabel": "Username",
+  "logUsernameLabel": "Nome utente",
   "@logUsernameLabel": {},
-  "logUsernameRequired": "Username richiesto",
+  "logUsernameRequired": "Nome utente richiesto",
   "@logUsernameRequired": {},
   "logPasswordLabel": "Password / App Password",
   "@logPasswordLabel": {},
@@ -1496,7 +1488,7 @@
   "@chromeShapeGuessOff": {},
   "chromeLabelPen": "Penna",
   "@chromeLabelPen": {},
-  "chromeLabelBallpoint": "Ballpoint",
+  "chromeLabelBallpoint": "Penna a sfera",
   "@chromeLabelBallpoint": {},
   "chromeLabelBrush": "Pennello",
   "@chromeLabelBrush": {},
@@ -1617,7 +1609,7 @@
   "@pmCancel": {},
   "pmDelete": "Elimina",
   "@pmDelete": {},
-  "pmPagesCut": "{count, plural, one{1 pagina tagliata — aprire il notebook di destinazione per incollare.} other{{count} pagine tagliate — aprire il notebook di destinazione per incollare.}}",
+  "pmPagesCut": "{count, plural, one{1 pagina tagliata — aprire il taccuino di destinazione per incollare.} other{{count} pagine tagliate — aprire il taccuino di destinazione per incollare.}}",
   "@pmPagesCut": {
     "placeholders": {
       "count": {
@@ -1625,7 +1617,7 @@
       }
     }
   },
-  "pmPagesCutSkipped": "{count} pagine tagliate ({skipped} non ancora caricate, saltate) — aprire il notebook di destinazione per incollare.",
+  "pmPagesCutSkipped": "{count} pagine tagliate ({skipped} non ancora caricate, saltate) — aprire il taccuino di destinazione per incollare.",
   "@pmPagesCutSkipped": {
     "placeholders": {
       "count": {
@@ -2187,5 +2179,329 @@
   "setLanguagePortuguese": "Português",
   "@setLanguagePortuguese": {},
   "setLanguageChinese": "中文",
-  "@setLanguageChinese": {}
+  "@setLanguageChinese": {},
+  "qlTrashDeletedNow": "Eliminato adesso",
+  "@qlTrashDeletedNow": {},
+  "qlTrashDeletedMinutes": "{count, plural, one{Eliminato {count} minuto fa} other{Eliminato {count} minuti fa}}",
+  "@qlTrashDeletedMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qlTrashDeletedHours": "{count, plural, one{Eliminato {count} ora fa} other{Eliminato {count} ore fa}}",
+  "@qlTrashDeletedHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qlTrashDeletedDays": "{count, plural, one{Eliminato {count} giorno fa} other{Eliminato {count} giorni fa}}",
+  "@qlTrashDeletedDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qlAdvancedLocalOnly": "Questi strumenti di recupero servono solo quando è collegato un server o Google Drive.",
+  "@qlAdvancedLocalOnly": {},
+  "qlNameRequired": "Inserisci un nome",
+  "@qlNameRequired": {},
+  "qlDuplicate": "Duplica",
+  "@qlDuplicate": {},
+  "qlDuplicateTitle": "{title} (copia)",
+  "@qlDuplicateTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "qlDuplicated": "Taccuino duplicato",
+  "@qlDuplicated": {},
+  "qlDuplicateNoLocalCopy": "Questo taccuino non è su questo dispositivo. Aprilo una volta per scaricarlo, poi duplicalo.",
+  "@qlDuplicateNoLocalCopy": {},
+  "qlDeleteOrphanBody": "Su questo dispositivo non resta nessuna copia di questo taccuino, quindi non si potrà ripristinare. Verrà rimosso dalla libreria.",
+  "@qlDeleteOrphanBody": {},
+  "qlDeletedNoTrash": "Rimosso. Su questo dispositivo non c'era nessuna copia, quindi nulla è finito nel cestino.",
+  "@qlDeletedNoTrash": {},
+  "qlOpenCorrupt": "I dati di questo taccuino sono danneggiati e non si possono aprire.",
+  "@qlOpenCorrupt": {},
+  "qlSearchNoResults": "Nessun taccuino corrisponde a “{query}”.",
+  "@qlSearchNoResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "qcMouseSelectHint": "Il mouse seleziona mentre è attiva una penna: per disegnare col mouse attivalo.",
+  "qcMouseDrawEnable": "Disegna col mouse",
+  "@qcMouseSelectHint": {},
+  "@qcMouseDrawEnable": {},
+  "qiIssueRemoteImage": "Immagine remota non scaricata: {arg}",
+  "@qiIssueRemoteImage": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueImageNotFound": "Immagine non trovata: {arg}",
+  "@qiIssueImageNotFound": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueImageUnreadable": "Immagine illeggibile: {arg}",
+  "@qiIssueImageUnreadable": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueAttachmentUnsupported": "Allegato non supportato (solo immagini): {arg}",
+  "@qiIssueAttachmentUnsupported": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueAttachmentTooLarge": "Allegato troppo grande, saltato: {arg}",
+  "@qiIssueAttachmentTooLarge": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueEmbedUnsupported": "Incorporamento non importato (solo immagini e note): {arg}",
+  "@qiIssueEmbedUnsupported": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueNoteEmbedNotFound": "Nota incorporata non trovata: {arg}",
+  "@qiIssueNoteEmbedNotFound": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueNoteEmbedSkipped": "Nota incorporata non espansa (circolare o troppo annidata): {arg}",
+  "@qiIssueNoteEmbedSkipped": {
+    "placeholders": {
+      "arg": {
+        "type": "String"
+      }
+    }
+  },
+  "qiIssueFileUnreadable": "File illeggibile",
+  "@qiIssueFileUnreadable": {},
+  "qiIssueFileTooLarge": "File troppo grande ({count} MB), saltato",
+  "@qiIssueFileTooLarge": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiIssueEncodingFallback": "Il testo non era UTF-8 valido: letto come Latin-1",
+  "@qiIssueEncodingFallback": {},
+  "qiIssueCsvUnreadable": "Tabella illeggibile",
+  "@qiIssueCsvUnreadable": {},
+  "qiIssueZipEntryTooLarge": "Elemento dell'archivio troppo grande ({count} MB), saltato",
+  "@qiIssueZipEntryTooLarge": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiIssueZipTotalTooLarge": "Il contenuto dell'archivio supera {count} MB: i file restanti sono stati saltati",
+  "@qiIssueZipTotalTooLarge": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiIssueHiddenFolders": "{count, plural, one{1 nota in una cartella nascosta è stata saltata} other{{count} note in cartelle nascoste sono state saltate}}",
+  "@qiIssueHiddenFolders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiIssueTooManyChapters": "{count} capitoli: valuta di importare le sottocartelle separatamente",
+  "@qiIssueTooManyChapters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiIssuePagesTruncated": "Nota troncata dopo {count} pagine",
+  "@qiIssuePagesTruncated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiIssueOneNoteSkipped": "{count, plural, one{1 elemento non supportato saltato} other{{count} elementi non supportati saltati}}",
+  "@qiIssueOneNoteSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiErrNoMarkdown": "Nessun file Markdown (.md) nella cartella scelta",
+  "@qiErrNoMarkdown": {},
+  "qiErrNoNotionContent": "Lo zip non contiene file .md o .csv: serve un export Notion «Markdown e CSV»",
+  "@qiErrNoNotionContent": {},
+  "qiErrNothingImportable": "Nessun contenuto importabile",
+  "@qiErrNothingImportable": {},
+  "qiErrZipUnreadable": "Il file zip è danneggiato o non è un archivio valido",
+  "@qiErrZipUnreadable": {},
+  "qiErrNoOneNotePages": "Nessuna pagina importabile in questo file",
+  "@qiErrNoOneNotePages": {},
+  "qiErrUnexpected": "errore imprevisto",
+  "@qiErrUnexpected": {},
+  "qiOneNoteSection": "Sezione {n}",
+  "@qiOneNoteSection": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "qiOneNotePage": "Pagina",
+  "@qiOneNotePage": {},
+  "qiPdfNotPdf": "Questo file non è un PDF valido",
+  "@qiPdfNotPdf": {},
+  "qiPdfCorrupt": "Questo PDF è danneggiato o incompleto e non può essere letto",
+  "@qiPdfCorrupt": {},
+  "qiPdfEmpty": "Questo PDF non contiene pagine",
+  "@qiPdfEmpty": {},
+  "qiPdfUnsupported": "Questo PDF usa una protezione o una funzione non supportata",
+  "@qiPdfUnsupported": {},
+  "qiPdfPasswordCancelled": "Importazione annullata: password non fornita",
+  "@qiPdfPasswordCancelled": {},
+  "qiPdfImportFailed": "Impossibile importare il PDF",
+  "@qiPdfImportFailed": {},
+  "qiPdfPasswordTitle": "PDF protetto da password",
+  "@qiPdfPasswordTitle": {},
+  "qiPdfPasswordBody": "Inserisci la password per importare questo PDF.",
+  "@qiPdfPasswordBody": {},
+  "qiPdfPasswordHint": "Password",
+  "@qiPdfPasswordHint": {},
+  "qiPdfPasswordWrong": "Password errata, riprova",
+  "@qiPdfPasswordWrong": {},
+  "qiPdfPasswordOpen": "Apri",
+  "@qiPdfPasswordOpen": {},
+  "qiPdfPageCount": "{count, plural, one{Il PDF ha 1 pagina.} other{Il PDF ha {count} pagine.}}",
+  "@qiPdfPageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qiPdfStartOutOfRange": "{count, plural, one{Il PDF ha 1 pagina. Inizio fuori range.} other{Il PDF ha {count} pagine. Inizio fuori range.}}",
+  "@qiPdfStartOutOfRange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qsReauthBanner": "Il server non accetta più il tuo accesso. Le modifiche restano al sicuro su questo dispositivo e si sincronizzeranno dopo il nuovo accesso.",
+  "@qsReauthBanner": {},
+  "qsReauthAction": "Accedi di nuovo",
+  "@qsReauthAction": {},
+  "qsDeletedElsewhere": "{count, plural, one{{count} quaderno è stato eliminato su un altro dispositivo. La tua copia resta solo qui.} other{{count} quaderni sono stati eliminati su un altro dispositivo. Le tue copie restano solo qui.}}",
+  "@qsDeletedElsewhere": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qsDeletedElsewhereHint": "Tieni premuto un quaderno e scegli \"Torna a sincronizzare questo quaderno\" per caricarlo di nuovo.",
+  "@qsDeletedElsewhereHint": {},
+  "qsRefreshTooltip": "Aggiorna dal server",
+  "@qsRefreshTooltip": {},
+  "qsResumeSyncPending": "Server non raggiungibile. Questo quaderno verrà caricato appena torna disponibile.",
+  "@qsResumeSyncPending": {},
+  "qsResumeSyncUploaded": "Caricato. Questo quaderno si sincronizza di nuovo.",
+  "@qsResumeSyncUploaded": {},
+  "qsNoServerConnected": "Nessun server collegato.",
+  "@qsNoServerConnected": {},
+  "qsLoginWrongCredentials": "Il server ha rifiutato nome utente o password.",
+  "@qsLoginWrongCredentials": {},
+  "qsLoginNotAServer": "Nessun server Nextcloud o WebDAV trovato a questo indirizzo. Controlla l'URL.",
+  "@qsLoginNotAServer": {},
+  "qsLoginUnreachable": "Impossibile raggiungere il server. Controlla l'indirizzo e la connessione.",
+  "@qsLoginUnreachable": {},
+  "qsLoginThrottled": "Troppi tentativi. Il server chiede di attendere un po' prima di riprovare.",
+  "@qsLoginThrottled": {},
+  "qsLoginServerError": "Il server ha restituito un errore. Riprova più tardi.",
+  "@qsLoginServerError": {},
+  "quPenNoMonitor": "Nessun monitor attivo rilevato.",
+  "@quPenNoMonitor": {},
+  "quPenNoDevice": "Nessun dispositivo penna trovato.",
+  "@quPenNoDevice": {},
+  "quPenBadGeometry": "Geometria del desktop non valida.",
+  "@quPenBadGeometry": {},
+  "quPenToolMissing": "{tool} non trovato.",
+  "@quPenToolMissing": {
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      }
+    }
+  },
+  "quPenToolFailed": "{tool} ha restituito un errore.",
+  "@quPenToolFailed": {
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      }
+    }
+  },
+  "quDiffStrokes": "Tratti",
+  "@quDiffStrokes": {},
+  "quDiffImages": "Immagini",
+  "@quDiffImages": {},
+  "quDiffShapes": "Forme",
+  "@quDiffShapes": {},
+  "quDiffTexts": "Testi",
+  "@quDiffTexts": {},
+  "quDefaultChapter": "Capitolo 1",
+  "@quDefaultChapter": {},
+  "qtNeedsOpenToUpload": "{count, plural, one{{count} quaderno è cambiato anche su un altro dispositivo} other{{count} quaderni sono cambiati anche su un altro dispositivo}}",
+  "@qtNeedsOpenToUpload": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "qtNeedsOpenToUploadHint": "Aprilo per unire e caricare le tue modifiche.",
+  "@qtNeedsOpenToUploadHint": {},
+  "qtResumeSyncNeedsOpen": "Il quaderno si sincronizza di nuovo. Aprilo per unire le modifiche fatte su un altro dispositivo.",
+  "@qtResumeSyncNeedsOpen": {}
 }

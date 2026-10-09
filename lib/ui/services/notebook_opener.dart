@@ -1,6 +1,10 @@
+import 'dart:async' show TimeoutException;
+import 'dart:io' show SocketException;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:abelnotes/core/providers/canvas_provider.dart';
 import 'package:abelnotes/core/providers/notebook_provider.dart';
 import 'package:abelnotes/core/providers/offline_providers.dart';
@@ -245,10 +249,18 @@ Future<void> _openNotebookAndNavigate(
     // Typed exceptions carry no user-facing text: localize them here, at the
     // point of display. Everything else falls back to the generic message.
     final String message;
-    if (e is NoLocalCopyOfflineException) {
+    // A stub has nothing to open without the download.
+    final unreachable = entry.notOnDevice &&
+        (e is SocketException || e is TimeoutException || e is http.ClientException);
+    if (e is NoLocalCopyOfflineException || unreachable) {
       message = l10n.nbNoLocalCopyOffline;
     } else if (e is FormatTooNewException) {
       message = l10n.cvFormatTooNew(e.fileVersion, e.supportedVersion);
+    } else if (e is FormatException ||
+        e is CorruptedArchiveException ||
+        e is TypeError) {
+      debugPrint('[NotebookOpener] corrupt notebook ${entry.metadata.id}: $e');
+      message = l10n.qlOpenCorrupt;
     } else {
       message = l10n.nbOpenFailed('$e');
     }

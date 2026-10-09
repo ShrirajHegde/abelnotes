@@ -32,15 +32,11 @@ class SyncService {
   /// loose-store helper still works, only genuine network calls are blocked.
   bool get isOffline => _remoteOrNull == null;
 
-  /// Network client. Throws a clear error in local-only mode. Pure helpers
-  /// (createNcnotePackage, extractNotebookContents, loadLooseStoreFromDisk,
-  /// parseNcnoteMetadata, buildPackageBytes) never touch this, so they run
-  /// offline; only real network operations reach this getter.
-  RemoteStore get _remote =>
-      _remoteOrNull ??
-      (throw StateError(
-          'Operazione di rete richiesta senza server connesso '
-          '(modalità solo-locale).'));
+  /// Network client. Throws [NoRemoteException] in local-only mode. Pure
+  /// helpers (createNcnotePackage, extractNotebookContents,
+  /// loadLooseStoreFromDisk, parseNcnoteMetadata, buildPackageBytes) never
+  /// touch this, so they run offline; only real network operations reach it.
+  RemoteStore get _remote => _remoteOrNull ?? (throw NoRemoteException());
 
   // ── Integrity Protection ──
 
@@ -894,9 +890,15 @@ class SyncService {
   /// know". The library's remote-deletion cleanup depends on this
   /// distinction — treating a network blip as "gone" would permanently
   /// wipe the local .ncnote of a notebook that's actually still alive.
-  Future<bool> deltaFolderExists(String notebookId) async {
-    // Fast path: already confirmed in this session
-    if (_deltaCommitted.contains(notebookId)) return true;
+  Future<bool> deltaFolderExists(String notebookId,
+      {bool fresh = false}) async {
+    // Fast path: already confirmed in this session ([fresh] skips it: another
+    // device may have deleted the folder since).
+    if (!fresh && _deltaCommitted.contains(notebookId)) return true;
+    if (fresh) {
+      _deltaCommitted.remove(notebookId);
+      _explodedDirsReady.remove(notebookId);
+    }
     try {
       final version =
           await _remote.getVersion('${_deltaDir(notebookId)}metadata.json');
@@ -910,6 +912,37 @@ class SyncService {
       if (e.statusCode == 404) return false;
       rethrow;
     }
+  }
+
+  /// True only on a definite "not there" from the server; any other failure
+  /// (network, 5xx, auth) rethrows so callers never mistake it for absence.
+  Future<bool> remoteFileAbsent(String remotePath) async {
+    try {
+      final version = await _remote.getVersion(remotePath);
+      return version == null && _remote.nullVersionMeansAbsent;
+    } on RemoteStoreException catch (e) {
+      if (e.statusCode == 404) return true;
+      rethrow;
+    }
+  }
+
+  /// Current server version of each of [fileNames] under pages/, null where
+  /// the page is not there. Throws on any failure other than a 404.
+  Future<Map<String, String?>> getPageVersions(
+      String notebookId, Iterable<String> fileNames) async {
+    final dir = '${_deltaDir(notebookId)}pages/';
+    final out = <String, String?>{};
+    await Future.wait(fileNames.map((fn) async {
+      try {
+        final v = await _remote.getVersionFast('$dir$fn') ??
+            await _remote.getVersion('$dir$fn');
+        out[fn] = v?.replaceAll('"', '');
+      } on RemoteStoreException catch (e) {
+        if (e.statusCode != 404) rethrow;
+        out[fn] = null;
+      }
+    }));
+    return out;
   }
 
   /// Deletes the notebook's exploded delta folder from the server.
@@ -1260,6 +1293,13 @@ class SyncService {
   }
 
   void dispose() {}
+}
+
+/// A network operation was attempted with no server connected. Technical
+/// text only: the UI maps this type to its own localized message.
+class NoRemoteException implements Exception {
+  @override
+  String toString() => 'NoRemoteException: no server connected (local-only mode)';
 }
 
 /// Exception thrown when a .ncnote archive is detected as corrupted.

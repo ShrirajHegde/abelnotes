@@ -11,7 +11,10 @@ import 'package:abelnotes/ui/theme/hw_theme.dart';
 /// successful connection it stores credentials, leaves local-only mode,
 /// and pops back — the auth gate then shows the library.
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  /// Set when the server rejected the saved credentials: the form opens
+  /// filled in and only the password is expected to change.
+  final NextcloudCredentials? reauth;
+  const LoginScreen({super.key, this.reauth});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -27,6 +30,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _error;
   bool _obscurePassword = true;
   WebDavServerType _serverType = WebDavServerType.nextcloud;
+  int _attempt = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final r = widget.reauth;
+    if (r != null) {
+      _serverController.text = r.serverUrl;
+      _userController.text = r.username;
+      _serverType = r.serverType;
+    }
+  }
+
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
+  }
 
   @override
   void dispose() {
@@ -37,12 +56,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    // Enter in a field reaches here while an attempt is already running.
+    if (_isLoading) return;
+    setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    final attempt = ++_attempt;
+    setState(() => _isLoading = true);
 
     final creds = NextcloudCredentials(
       serverUrl: _serverController.text.trim(),
@@ -57,14 +77,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // presents right now and make the user confirm it BEFORE any real
     // request (credentials included) goes over this connection — not
     // trust-then-hope. Null means either plain HTTP (nothing to pin) or the
-    // TCP/TLS probe itself failed, in which case testConnection() below
-    // will surface the real error.
+    // TCP/TLS probe itself failed, in which case probeConnection() below
+    // will surface the real error. A certificate this device already pinned
+    // for the same server needs no second confirmation.
     final fingerprint =
         await WebDavService.probeCertificateFingerprint(creds.serverUrl);
-    if (fingerprint != null) {
+    if (fingerprint != null &&
+        !(widget.reauth?.certFingerprint == fingerprint &&
+            widget.reauth?.serverUrl == creds.serverUrl)) {
       final trusted = await _confirmCertificate(fingerprint);
       if (!trusted) {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
     }
@@ -82,12 +105,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
 
     try {
-      final connected = await webdav.testConnection();
-      if (!connected) {
+      final probe = await webdav.probeConnection();
+      if (probe != ConnectionProbe.ok) {
+        if (!mounted || attempt != _attempt) return;
         setState(() {
           _error = webdav.certificateMismatchDetected
               ? l10n.logCertificateChanged
-              : l10n.logConnectionFailed;
+              : switch (probe) {
+                  ConnectionProbe.unauthorized => l10n.qsLoginWrongCredentials,
+                  ConnectionProbe.notAServer => l10n.qsLoginNotAServer,
+                  ConnectionProbe.throttled => l10n.qsLoginThrottled,
+                  ConnectionProbe.serverError => l10n.qsLoginServerError,
+                  _ => l10n.qsLoginUnreachable,
+                };
           _isLoading = false;
         });
         return;
@@ -111,6 +141,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // gate rebuilds to the library now that credentials exist.
       if (Navigator.of(context).canPop()) Navigator.of(context).pop();
     } catch (e) {
+      if (!mounted || attempt != _attempt) return;
       setState(() {
         _error = webdav.certificateMismatchDetected
             ? l10n.logCertificateChanged
@@ -193,6 +224,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: Form(
                     key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: _clearError,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,

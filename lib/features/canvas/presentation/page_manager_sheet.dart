@@ -18,6 +18,7 @@ import 'package:abelnotes/features/canvas/data/render_engine.dart';
 import 'package:abelnotes/features/canvas/data/thumbnail_simplify.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import 'package:abelnotes/shared/models/ncnote_format.dart';
+import 'package:abelnotes/shared/utils/chapter_title.dart';
 import 'package:abelnotes/ui/primitives/hw_button.dart';
 import 'package:abelnotes/ui/theme/hw_icons.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
@@ -134,7 +135,8 @@ Future<String?> _pickChapter(
               ),
               ...s.metadata.chapters.map((chapter) => row(
                     icon: 'chapter',
-                    label: chapter.title,
+                    label: chapterDisplayTitle(
+                        AppLocalizations.of(shCtx), chapter.title),
                     selected: selectedChapterId == chapter.id,
                     onTap: () => Navigator.of(shCtx).pop(chapter.id),
                   )),
@@ -557,7 +559,8 @@ class _PageManagerSheetState extends ConsumerState<PageManagerSheet> {
                               final chapter = entry.value;
                               final isActive = liveState.activeChapterId == chapter.id;
                               final chip = ChoiceChip(
-                                label: Text(chapter.title),
+                                label: Text(chapterDisplayTitle(
+                                    AppLocalizations.of(context), chapter.title)),
                                 selected: isActive,
                                 // Tapping the active chapter no longer
                                 // deselects it — leaving the user in the
@@ -592,7 +595,9 @@ class _PageManagerSheetState extends ConsumerState<PageManagerSheet> {
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         child: Text(
-                                          chapter.title,
+                                          chapterDisplayTitle(
+                                              AppLocalizations.of(context),
+                                              chapter.title),
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w500,
@@ -807,7 +812,7 @@ class _PageManagerSheetState extends ConsumerState<PageManagerSheet> {
     if (action == 'rename') {
       final newTitle = await _promptForTextLocal(
           ctx, l10n.pmRenameChapter, l10n.pmChapterNameHint,
-          initial: chapter.title);
+          initial: chapterDisplayTitle(l10n, chapter.title));
       if (newTitle != null && newTitle.trim().isNotEmpty && mounted) {
         ref.read(canvasProvider.notifier).renameChapter(chapter.id, newTitle.trim());
       }
@@ -821,7 +826,8 @@ class _PageManagerSheetState extends ConsumerState<PageManagerSheet> {
         context: ctx,
         builder: (dCtx) => AlertDialog(
           title: Text(l10n.pmDeleteChapter),
-          content: Text(l10n.pmDeleteChapterConfirm(chapter.title)),
+          content: Text(l10n.pmDeleteChapterConfirm(
+              chapterDisplayTitle(l10n, chapter.title))),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dCtx, false),
@@ -1174,7 +1180,9 @@ class _PageGridReorderableState extends ConsumerState<PageGridReorderable> {
   String? _chapterNameForPage(int docIdx) {
     final entry = widget.liveState.document.pages[docIdx];
     for (final c in widget.liveState.metadata.chapters) {
-      if (c.id == entry.chapterId) return c.title;
+      if (c.id == entry.chapterId) {
+        return chapterDisplayTitle(AppLocalizations.of(context), c.title);
+      }
     }
     return null;
   }

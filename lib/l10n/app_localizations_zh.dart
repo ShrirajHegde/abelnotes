@@ -1088,7 +1088,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setLanguageSub => '界面语言';
 
   @override
-  String get setLanguageItalian => '意大利语';
+  String get setLanguageItalian => 'Italiano';
 
   @override
   String get setFavoritesFirst => '收藏优先';
@@ -1313,11 +1313,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setTrashEmptyState => '回收站是空的。';
-
-  @override
-  String setTrashDeletedAgo(String time) {
-    return '$time前删除';
-  }
 
   @override
   String get setTrashRestore => '恢复';
@@ -2582,4 +2577,352 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get setLanguageChinese => '中文';
+
+  @override
+  String get qlTrashDeletedNow => '刚刚删除';
+
+  @override
+  String qlTrashDeletedMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 分钟前删除',
+      one: '$count 分钟前删除',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qlTrashDeletedHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 小时前删除',
+      one: '$count 小时前删除',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qlTrashDeletedDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 天前删除',
+      one: '$count 天前删除',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qlAdvancedLocalOnly => '这些恢复工具仅在连接了服务器或 Google Drive 时适用。';
+
+  @override
+  String get qlNameRequired => '请输入名称';
+
+  @override
+  String get qlDuplicate => '创建副本';
+
+  @override
+  String qlDuplicateTitle(String title) {
+    return '$title（副本）';
+  }
+
+  @override
+  String get qlDuplicated => '笔记本已复制';
+
+  @override
+  String get qlDuplicateNoLocalCopy => '此笔记本不在本设备上。请先打开一次以下载，然后再创建副本。';
+
+  @override
+  String get qlDeleteOrphanBody => '这台设备上已没有此笔记本的任何副本，因此无法恢复。它将从笔记库中移除。';
+
+  @override
+  String get qlDeletedNoTrash => '已移除。这台设备上没有副本，因此没有任何内容进入回收站。';
+
+  @override
+  String get qlOpenCorrupt => '此笔记本的数据已损坏，无法打开。';
+
+  @override
+  String qlSearchNoResults(String query) {
+    return '没有与“$query”匹配的笔记本。';
+  }
+
+  @override
+  String get qcMouseSelectHint => '使用笔工具时，鼠标用于选择。开启鼠标绘图后才能用鼠标书写。';
+
+  @override
+  String get qcMouseDrawEnable => '用鼠标绘图';
+
+  @override
+  String qiIssueRemoteImage(String arg) {
+    return '未下载远程图片：$arg';
+  }
+
+  @override
+  String qiIssueImageNotFound(String arg) {
+    return '未找到图片：$arg';
+  }
+
+  @override
+  String qiIssueImageUnreadable(String arg) {
+    return '无法读取图片：$arg';
+  }
+
+  @override
+  String qiIssueAttachmentUnsupported(String arg) {
+    return '不支持的附件（仅支持图片）：$arg';
+  }
+
+  @override
+  String qiIssueAttachmentTooLarge(String arg) {
+    return '附件过大，已跳过：$arg';
+  }
+
+  @override
+  String qiIssueEmbedUnsupported(String arg) {
+    return '未导入嵌入文件（仅支持图片和笔记）：$arg';
+  }
+
+  @override
+  String qiIssueNoteEmbedNotFound(String arg) {
+    return '未找到嵌入的笔记：$arg';
+  }
+
+  @override
+  String qiIssueNoteEmbedSkipped(String arg) {
+    return '未展开嵌入的笔记（循环引用或嵌套过深）：$arg';
+  }
+
+  @override
+  String get qiIssueFileUnreadable => '无法读取文件';
+
+  @override
+  String qiIssueFileTooLarge(int count) {
+    return '文件过大（$count MB），已跳过';
+  }
+
+  @override
+  String get qiIssueEncodingFallback => '文本不是有效的 UTF-8，已按 Latin-1 读取';
+
+  @override
+  String get qiIssueCsvUnreadable => '无法读取表格';
+
+  @override
+  String qiIssueZipEntryTooLarge(int count) {
+    return '压缩包内文件过大（$count MB），已跳过';
+  }
+
+  @override
+  String qiIssueZipTotalTooLarge(int count) {
+    return '压缩包内容超过 $count MB，其余文件已跳过';
+  }
+
+  @override
+  String qiIssueHiddenFolders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已跳过隐藏文件夹中的 $count 篇笔记',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qiIssueTooManyChapters(int count) {
+    return '共 $count 个章节：建议分别导入子文件夹';
+  }
+
+  @override
+  String qiIssuePagesTruncated(int count) {
+    return '笔记在 $count 页后被截断';
+  }
+
+  @override
+  String qiIssueOneNoteSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已跳过 $count 个不支持的元素',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qiErrNoMarkdown => '所选文件夹中没有 Markdown (.md) 文件';
+
+  @override
+  String get qiErrNoNotionContent =>
+      '该 zip 中没有 .md 或 .csv 文件：请使用 Notion 的“Markdown 与 CSV”导出';
+
+  @override
+  String get qiErrNothingImportable => '没有可导入的内容';
+
+  @override
+  String get qiErrZipUnreadable => 'zip 文件已损坏或不是有效的压缩包';
+
+  @override
+  String get qiErrNoOneNotePages => '此文件中没有可导入的页面';
+
+  @override
+  String get qiErrUnexpected => '意外错误';
+
+  @override
+  String qiOneNoteSection(int n) {
+    return '分区 $n';
+  }
+
+  @override
+  String get qiOneNotePage => '页面';
+
+  @override
+  String get qiPdfNotPdf => '此文件不是有效的 PDF';
+
+  @override
+  String get qiPdfCorrupt => '此 PDF 已损坏或不完整，无法读取';
+
+  @override
+  String get qiPdfEmpty => '此 PDF 没有页面';
+
+  @override
+  String get qiPdfUnsupported => '此 PDF 使用了不受支持的保护或功能';
+
+  @override
+  String get qiPdfPasswordCancelled => '已取消导入：未提供密码';
+
+  @override
+  String get qiPdfImportFailed => '无法导入该 PDF';
+
+  @override
+  String get qiPdfPasswordTitle => '受密码保护的 PDF';
+
+  @override
+  String get qiPdfPasswordBody => '请输入密码以导入此 PDF。';
+
+  @override
+  String get qiPdfPasswordHint => '密码';
+
+  @override
+  String get qiPdfPasswordWrong => '密码错误，请重试';
+
+  @override
+  String get qiPdfPasswordOpen => '打开';
+
+  @override
+  String qiPdfPageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '该 PDF 共有 $count 页。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qiPdfStartOutOfRange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '该 PDF 共有 $count 页。起始页超出范围。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qsReauthBanner => '服务器不再接受你的登录。你的更改安全保存在此设备上，重新登录后会同步。';
+
+  @override
+  String get qsReauthAction => '重新登录';
+
+  @override
+  String qsDeletedElsewhere(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '有 $count 个笔记本已在另一台设备上删除。你的副本仅保留在这里。',
+      one: '有 $count 个笔记本已在另一台设备上删除。你的副本仅保留在这里。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qsDeletedElsewhereHint => '长按笔记本并选择“重新同步这个笔记本”即可再次上传。';
+
+  @override
+  String get qsRefreshTooltip => '从服务器刷新';
+
+  @override
+  String get qsResumeSyncPending => '无法连接服务器。服务器恢复后会立即上传此笔记本。';
+
+  @override
+  String get qsResumeSyncUploaded => '已上传。此笔记本已恢复同步。';
+
+  @override
+  String get qsNoServerConnected => '未连接任何服务器。';
+
+  @override
+  String get qsLoginWrongCredentials => '服务器拒绝了用户名或密码。';
+
+  @override
+  String get qsLoginNotAServer => '在此地址未找到 Nextcloud 或 WebDAV 服务器。请检查网址。';
+
+  @override
+  String get qsLoginUnreachable => '无法连接服务器。请检查地址和网络连接。';
+
+  @override
+  String get qsLoginThrottled => '尝试次数过多。服务器要求你稍等片刻再试。';
+
+  @override
+  String get qsLoginServerError => '服务器返回错误。请稍后再试。';
+
+  @override
+  String get quPenNoMonitor => '未检测到活动显示器。';
+
+  @override
+  String get quPenNoDevice => '未找到手写笔设备。';
+
+  @override
+  String get quPenBadGeometry => '桌面几何信息无效。';
+
+  @override
+  String quPenToolMissing(String tool) {
+    return '未找到 $tool。';
+  }
+
+  @override
+  String quPenToolFailed(String tool) {
+    return '$tool 执行失败。';
+  }
+
+  @override
+  String get quDiffStrokes => '笔画';
+
+  @override
+  String get quDiffImages => '图片';
+
+  @override
+  String get quDiffShapes => '形状';
+
+  @override
+  String get quDiffTexts => '文本';
+
+  @override
+  String get quDefaultChapter => '第 1 章';
+
+  @override
+  String qtNeedsOpenToUpload(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '有 $count 个笔记本在其他设备上也有更改',
+      one: '有 $count 个笔记本在其他设备上也有更改',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qtNeedsOpenToUploadHint => '打开它即可合并并上传你的更改。';
+
+  @override
+  String get qtResumeSyncNeedsOpen => '此笔记本已恢复同步。打开它以合并在其他设备上所做的更改。';
 }

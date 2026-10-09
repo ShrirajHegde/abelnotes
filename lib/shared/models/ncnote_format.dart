@@ -290,6 +290,9 @@ class ImageData with _$ImageData {
     @Default(false) bool locked,
     @Default(false) bool flipHorizontal,
     String? comment,
+    /// Source page size in PDF points, set on imported PDF page rasters.
+    double? pdfWidthPt,
+    double? pdfHeightPt,
   }) = _ImageData;
 
   factory ImageData.fromJson(Map<String, dynamic> json) =>

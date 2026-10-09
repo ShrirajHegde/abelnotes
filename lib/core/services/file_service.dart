@@ -653,6 +653,33 @@ class FileService {
     );
   }
 
+  /// Updates only what a library card shows. Sync state is left as stored:
+  /// a refresh working from an older snapshot of the row must not put back a
+  /// status or etag that an upload settled in the meantime.
+  Future<void> refreshNotebookCard({
+    required String id,
+    required String title,
+    required DateTime localModifiedAt,
+    required int? coverColor,
+    required String? paperType,
+    required int pageCount,
+    DateTime? createdAt,
+  }) async {
+    await _db.update(
+      'notebooks',
+      {
+        'title': title,
+        'local_modified_at': localModifiedAt.toIso8601String(),
+        'cover_color': coverColor,
+        'paper_type': paperType,
+        'page_count': pageCount,
+        if (createdAt != null) 'created_at': createdAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   /// Returns all locally-tracked notebook metadata rows.
   Future<List<Map<String, dynamic>>> getAllNotebookMeta() async {
     return _db.query('notebooks', orderBy: 'local_modified_at DESC');
@@ -1127,6 +1154,6 @@ class TrashEntry {
     required this.meta,
   });
 
-  String get title => meta?['title'] as String? ?? 'Senza titolo';
+  String get title => meta?['title'] as String? ?? '';
   int get coverColor => meta?['cover_color'] as int? ?? 0xFF1565C0;
 }

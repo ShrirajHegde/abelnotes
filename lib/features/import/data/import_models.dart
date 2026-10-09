@@ -86,7 +86,11 @@ class ImportedChapterDraft {
   final String title;
   final List<ImportBlock> blocks;
 
-  const ImportedChapterDraft({required this.title, required this.blocks});
+  /// Name shown in warnings (the file name incl. extension); defaults to [title].
+  final String? sourceName;
+
+  const ImportedChapterDraft(
+      {required this.title, required this.blocks, this.sourceName});
 }
 
 /// A complete parsed source, ready for pagination. Plain data only so it
@@ -111,19 +115,74 @@ class ImportedNotebookDraft {
 
 enum ImportIssueSeverity { info, warning, error }
 
+/// What went wrong, as data. The UI maps each code to a localized sentence
+/// (see import_messages.dart); importers never emit user-facing prose.
+enum ImportIssueCode {
+  remoteImageSkipped(ImportIssueSeverity.info),
+  imageNotFound(ImportIssueSeverity.warning),
+  imageUnreadable(ImportIssueSeverity.warning),
+  attachmentUnsupported(ImportIssueSeverity.info),
+  attachmentTooLarge(ImportIssueSeverity.warning),
+  embedUnsupported(ImportIssueSeverity.info),
+  noteEmbedNotFound(ImportIssueSeverity.warning),
+  noteEmbedTooDeep(ImportIssueSeverity.info),
+  fileUnreadable(ImportIssueSeverity.error),
+  fileTooLarge(ImportIssueSeverity.warning),
+  encodingFallback(ImportIssueSeverity.info),
+  csvUnreadable(ImportIssueSeverity.error),
+  zipEntryTooLarge(ImportIssueSeverity.warning),
+  zipTotalTooLarge(ImportIssueSeverity.warning),
+  hiddenFoldersSkipped(ImportIssueSeverity.info),
+  tooManyChapters(ImportIssueSeverity.warning),
+  pagesTruncated(ImportIssueSeverity.warning),
+  oneNoteElementsSkipped(ImportIssueSeverity.info),
+  ;
+
+  final ImportIssueSeverity severity;
+  const ImportIssueCode(this.severity);
+}
+
 /// One per-file problem surfaced to the user in the final report
 /// ("image X not found", "page skipped"). Never fails the whole import
-/// unless severity is [ImportIssueSeverity.error] at the source level.
+/// unless the failure is thrown as an [ImportException].
 class ImportIssue {
+  /// Vault-relative path or readable chapter title (never an absolute path).
   final String source;
-  final ImportIssueSeverity severity;
-  final String message;
+  final ImportIssueCode code;
+
+  /// Offending path/URL/name the message refers to, when there is one.
+  final String? arg;
+
+  /// Numeric parameter (count of pages, files, MB, ...), when there is one.
+  final int? count;
 
   const ImportIssue({
     required this.source,
-    this.severity = ImportIssueSeverity.warning,
-    required this.message,
+    required this.code,
+    this.arg,
+    this.count,
   });
+
+  ImportIssueSeverity get severity => code.severity;
+}
+
+/// Why a whole import was refused. Carries no prose: the UI picks the
+/// localized message from [code].
+enum ImportErrorCode {
+  noMarkdownFiles,
+  noNotionContent,
+  nothingImportable,
+  zipUnreadable,
+  noOneNotePages,
+}
+
+class ImportException implements Exception {
+  final ImportErrorCode code;
+
+  const ImportException(this.code);
+
+  @override
+  String toString() => 'ImportException: ${code.name}';
 }
 
 enum ImportPhase { scanning, parsing, paginating, packaging, done }
@@ -137,11 +196,16 @@ class ImportProgress {
   /// Currently processed file/chapter name, for the dialog subtitle.
   final String? detail;
 
+  /// Overall completion 0..1 when the phase can tell more than current/total
+  /// (e.g. progress inside one huge chapter).
+  final double? fraction;
+
   const ImportProgress({
     required this.phase,
     this.current = 0,
     this.total = 0,
     this.detail,
+    this.fraction,
   });
 }
 

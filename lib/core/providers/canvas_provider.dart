@@ -9,11 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:abelnotes/config/app_config.dart';
 import 'package:abelnotes/core/services/crash_logger.dart';
-import 'package:abelnotes/core/services/remote_store.dart' show RemoteStorageFullException;
+import 'package:abelnotes/core/services/remote_store.dart'
+    show RemoteStorageFullException, RemoteStoreException;
 import 'package:abelnotes/core/providers/app_settings_provider.dart';
 import 'package:abelnotes/core/providers/cross_notebook_clipboard_provider.dart';
 import 'package:abelnotes/core/providers/notebook_provider.dart';
 import 'package:abelnotes/core/providers/offline_providers.dart';
+import 'package:abelnotes/core/providers/remote_store_provider.dart'
+    show remoteStoreProvider;
 import 'package:abelnotes/core/services/sync_service.dart';
 import 'package:abelnotes/core/services/symbol_library_service.dart';
 import 'package:abelnotes/core/services/webdav_service.dart' show WebDavException;
@@ -24,8 +27,10 @@ import 'package:abelnotes/features/canvas/data/render_engine.dart'
         circleResizeBox,
         scaledShapeResizeBox,
         shapeBodyContains,
-        shapeEllipseRect;
+        shapeEllipseRect,
+        triangleCorners;
 import 'package:abelnotes/features/canvas/data/math_rasterizer.dart';
+import 'package:abelnotes/features/canvas/data/shape_recognizer.dart';
 import 'package:abelnotes/shared/models/ncnote_format.dart';
 import 'package:abelnotes/shared/utils/rich_paste.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -916,6 +921,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     );
   }
 
+  @visibleForTesting
+  static PageData? mergePageElementsForTest(
+          {required PageData base,
+          required PageData local,
+          required PageData remote}) =>
+      _mergePageElements(base: base, local: local, remote: remote);
+
   /// Timer for pulling remote changes from other devices.
   Timer? _pullTimer;
 
@@ -1076,6 +1088,15 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     // very first tool the user touches already shows the previous
     // session's width/color/eraser size.
     _toolPrefsLoaded = _loadToolPrefs();
+    // A new client (re-login after a password change, reconnect) ends the
+    // failure streak: push what is waiting instead of sleeping out the backoff.
+    _ref.listen(remoteStoreProvider, (prev, next) {
+      if (next == null || _disposed || state == null) return;
+      _consecutiveSyncFailures = 0;
+      _pullUnreachable = false;
+      _recomputeSyncStatus();
+      _retryUnpushed();
+    });
   }
   late final Future<void> _toolPrefsLoaded;
 
@@ -1173,6 +1194,9 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     // yet here, so flip it once the notebook is on screen.
     unawaited(Future<void>.delayed(const Duration(seconds: 2), () {
       final st = state;
+      // Kept on this device or offline: nothing can go up, a save would only
+      // rewrite the files and bump the modified time on every open.
+      if (keptLocal.value) return;
       if (st != null && st.metadata.id == notebookId && !st.isDirty) {
         state = st.copyWith(isDirty: true);
       }
@@ -1181,7 +1205,13 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
   void setViewportSize(Size size) {
     final wasNull = _viewportSize == null;
+    final old = _viewportSize;
     _viewportSize = size;
+    if (!wasNull && old != size && state != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (state != null && _viewportSize == size) _refitPanToViewport(old!, size);
+      });
+    }
     if (wasNull && state != null) {
       // Scratch: an infinite canvas has no fit-scaling, so centre the big
       // page's middle on the viewport. Ordinary pages: only re-centre when
@@ -1200,6 +1230,24 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         });
       }
     }
+  }
+
+  /// Keeps the page where the user left it relative to the viewport centre
+  /// after a window resize (a stale pan left the page off-screen).
+  void _refitPanToViewport(Size from, Size to) {
+    final s = state!;
+    final page = s.currentPage;
+    if (page == null) return;
+    Offset centered(Size vp) => s.isScratch
+        ? Offset(vp.width / 2 - AppConfig.scratchPageSize * s.zoom / 2,
+            vp.height / 2 - AppConfig.scratchPageSize * s.zoom / 2)
+        : Offset(vp.width * (1 - s.zoom) / 2, 0);
+    double base(Size vp) => s.isScratch
+        ? 1.0
+        : min(vp.width / page.width, vp.height / page.height);
+    final ratio = base(to) / base(from);
+    final delta = s.panOffset - centered(from);
+    state = s.copyWith(panOffset: centered(to) + delta * ratio);
   }
 
   /// Compute the panOffset that horizontally centres the page at given zoom.
@@ -1932,6 +1980,22 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   static int _filenameNum(String fn) {
     final m = _pageFileRe.firstMatch(fn);
     return m != null ? (int.tryParse(m.group(1)!) ?? 99999) : 99999;
+  }
+
+  /// Chapter membership lists rebuilt from the authoritative
+  /// PageEntry.chapterId (addPage & co. only set the entry, so the lists
+  /// written to metadata.json went stale).
+  static List<Chapter> _chaptersWithMembership(
+      List<Chapter> chapters, DocumentStructure doc) {
+    final byChapter = <String, List<String>>{};
+    for (final e in doc.pages) {
+      final cid = e.chapterId;
+      if (cid != null) (byChapter[cid] ??= []).add(e.pageId);
+    }
+    return [
+      for (final c in chapters)
+        c.copyWith(pageIds: byChapter[c.id] ?? const <String>[]),
+    ];
   }
 
   /// Build a `pageId → chapterId` map from the canonical chapter list in
@@ -2973,14 +3037,14 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     switch (shape.shapeType) {
       case 'line':
       case 'arrow':
-        final snapped = _snapLineEnd(shape.x1, shape.y1, position.dx, position.dy);
+        final snapped = snapLineEnd(shape.x1, shape.y1, position.dx, position.dy);
         // copyWith preserves isHighlighter (and any other untouched field)
         // — a from-scratch rebuild silently reset it to opaque on every
         // drag, which is why a highlighter-drawn recognized line turned
         // solid the moment the user adjusted it.
         updated = shape.copyWith(x2: snapped[0], y2: snapped[1]);
         break;
-      case 'circle':
+      case 'circle' when _isRound(shape):
         final box = circleResizeBox(
             Offset((shape.x1 + shape.x2) / 2, (shape.y1 + shape.y2) / 2),
             position);
@@ -2989,8 +3053,9 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
           x2: box.right, y2: box.bottom,
         );
         break;
-      case 'triangle':
       case 'rectangle':
+        updated = _dragRectCorner(shape, position);
+        break;
       default:
         // Drag adjusts the bottom-right corner
         updated = shape.copyWith(x2: position.dx, y2: position.dy);
@@ -2999,12 +3064,31 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     state = state!.copyWith(recognizedShape: updated);
   }
 
+  /// A circle whose box is square and unrotated (not a recognized oval).
+  static bool _isRound(ShapeData s) =>
+      s.rotation == 0 && ((s.x2 - s.x1).abs() - (s.y2 - s.y1).abs()).abs() < 1;
+
+  /// Moves the (x2,y2) corner of a possibly rotated rectangle to [cursor] on
+  /// the page, keeping the opposite corner where it is on the page.
+  static ShapeData _dragRectCorner(ShapeData s, Offset cursor) {
+    if (s.rotation == 0) return s.copyWith(x2: cursor.dx, y2: cursor.dy);
+    final c0 = Offset((s.x1 + s.x2) / 2, (s.y1 + s.y2) / 2);
+    final ca = cos(s.rotation), sa = sin(s.rotation);
+    Offset rot(Offset p, double c, double sn) =>
+        Offset(p.dx * c - p.dy * sn, p.dx * sn + p.dy * c);
+    final anchor = c0 + rot(Offset(s.x1, s.y1) - c0, ca, sa);
+    final u = rot(cursor - anchor, ca, -sa);
+    final c1 = anchor + rot(u / 2, ca, sa);
+    final a = c1 - u / 2, b = c1 + u / 2;
+    return s.copyWith(x1: a.dx, y1: a.dy, x2: b.dx, y2: b.dy);
+  }
+
   /// For line shapes: keep x1,y1 fixed and move x2,y2 to [position].
   /// This lets the user adjust angle and length after hold-to-recognize.
   void setRecognizedLineEndpoint(Offset position) {
     if (state == null || state!.recognizedShape == null) return;
     final s = state!.recognizedShape!;
-    final snapped = _snapLineEnd(s.x1, s.y1, position.dx, position.dy);
+    final snapped = snapLineEnd(s.x1, s.y1, position.dx, position.dy);
     state = state!.copyWith(
       recognizedShape: s.copyWith(x2: snapped[0], y2: snapped[1]),
     );
@@ -3016,7 +3100,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     if (state == null || state!.recognizedShape == null) return;
     final s = state!.recognizedShape!;
 
-    if (s.shapeType == 'circle') {
+    if (s.shapeType == 'circle' && _isRound(s)) {
       final box = circleResizeBox(
           Offset((s.x1 + s.x2) / 2, (s.y1 + s.y2) / 2), position);
       state = state!.copyWith(
@@ -3028,7 +3112,9 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       return;
     }
 
-    if (s.shapeType == 'triangle' || s.shapeType == 'rhombus') {
+    if (s.shapeType == 'triangle' ||
+        s.shapeType == 'rhombus' ||
+        s.shapeType == 'circle') {
       final base = _heldShapeBase ?? s;
       final box = scaledShapeResizeBox(
         Rect.fromPoints(Offset(base.x1, base.y1), Offset(base.x2, base.y2)),
@@ -3045,10 +3131,10 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     }
 
     // x1,y1 is the anchor (opposite corner from pen at recognition time).
-    // x2,y2 follows the cursor freely — rendering uses Rect.fromPoints
-    // so any ordering is handled correctly.
     state = state!.copyWith(
-      recognizedShape: s.copyWith(x2: position.dx, y2: position.dy),
+      recognizedShape: s.shapeType == 'rectangle'
+          ? _dragRectCorner(s, position)
+          : s.copyWith(x2: position.dx, y2: position.dy),
     );
   }
 
@@ -3128,491 +3214,12 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   }
 
 
-  // ── Shape recognition (improved) ──
-
-  ShapeData? _recognizeShape(List<StrokePoint> points) {
-    if (points.length < 5) return null;
-
-    final xs = points.map((p) => p.x).toList();
-    final ys = points.map((p) => p.y).toList();
-    final minX = xs.reduce(min);
-    final maxX = xs.reduce(max);
-    final minY = ys.reduce(min);
-    final maxY = ys.reduce(max);
-    final width = maxX - minX;
-    final height = maxY - minY;
-    final maxDim = max(width, height);
-
-    if (maxDim < 10) return null;
-
-    // Total path length vs straight line distance
-    double pathLen = 0;
-    for (int i = 1; i < points.length; i++) {
-      pathLen += sqrt(pow(points[i].x - points[i - 1].x, 2) + pow(points[i].y - points[i - 1].y, 2));
-    }
-    final startEndDist = sqrt(pow(points.last.x - points.first.x, 2) + pow(points.last.y - points.first.y, 2));
-    
-    // A recognized shape is a clean geometric figure that REPLACES the
-    // freehand gesture, so it should carry the tool's nominal width — exactly
-    // like a shape drawn with the manual shape tool (see _finalizeShape, which
-    // uses toolSettings.strokeWidth directly). Earlier attempts scaled this by
-    // average pressure (a linear 0.15..1.0× map, then a sqrt 0.35..1.50× one),
-    // but a flat-width shape painted at the average pressure still read as
-    // thinner than the default line — pressure modulation belongs to live
-    // strokes, not to the snapped result. Use the full stroke width.
-    final visualWidth = state!.toolSettings.strokeWidth;
-    final color = state!.toolSettings.color;
-    // A shape recognized while the highlighter is active must keep the
-    // highlighter's translucent multiply look — otherwise it commits as
-    // an opaque mark that covers whatever ink is underneath it.
-    final isHighlighter = state!.currentTool == CanvasTool.highlighter;
-
-    // ── LINE DETECTION ──
-    // If the path length is barely longer than the distance between
-    // start and end, treat as a straight line. Arrow auto-recognition
-    // was removed because tiny natural wobbles at the end of a line
-    // were being misclassified as an arrow head — the user almost
-    // always wanted just a line. Arrows can still be drawn manually
-    // via the shape tool.
-    if (pathLen > 20 && (pathLen / startEndDist) < 1.25) {
-      return ShapeData(
-        shapeType: 'line',
-        x1: points.first.x, y1: points.first.y,
-        x2: _snapLineEnd(points.first.x, points.first.y, points.last.x, points.last.y)[0],
-        y2: _snapLineEnd(points.first.x, points.first.y, points.last.x, points.last.y)[1],
-        strokeColor: color, strokeWidth: visualWidth, isHighlighter: isHighlighter,
+  ShapeData? _recognizeShape(List<StrokePoint> points) => recognizeShape(
+        points,
+        color: state!.toolSettings.color,
+        strokeWidth: state!.toolSettings.strokeWidth,
+        isHighlighter: state!.currentTool == CanvasTool.highlighter,
       );
-    }
-
-    // ── CLOSURE CHECK ──
-    // Allow a generous overlap gap for messy hand drawing
-    final isClosed = startEndDist < maxDim * 0.35;
-    if (!isClosed) return null;
-
-    // Auto-fill closed shapes with a transparent version of the stroke color.
-    const fillAlpha = 0x30; // ~19% opacity
-    final autoFill = (color & 0x00FFFFFF) | (fillAlpha << 24);
-
-    // ── POLYGON DETECTION (Douglas-Peucker) — run early to inform circle vs rect ──
-    final offsets = points.map((p) => Offset(p.x, p.y)).toList();
-    
-    // Lowered epsilon to 0.06 to avoid over-smoothing rounded corners
-    final simplified = _douglasPeucker(offsets, maxDim * 0.06);
-    
-    // Remove the last point if it overlaps the first to get the true corner count
-    List<Offset> corners = List.from(simplified);
-    if (corners.length > 1 && (corners.first - corners.last).distance < maxDim * 0.25) {
-      corners.removeLast();
-    }
-
-    // ── CIRCLE DETECTION (Radial Variance) ──
-    // A circle has many Douglas-Peucker segments (7+), while
-    // rectangles have 4-6 and triangles have 3. Use corner count
-    // to disambiguate: only accept circle if NOT in polygon range (4-6).
-    final cx = (minX + maxX) / 2;
-    final cy = (minY + maxY) / 2;
-    double sumR = 0, sumR2 = 0;
-    
-    for (final p in points) {
-      final r = sqrt(pow(p.x - cx, 2) + pow(p.y - cy, 2));
-      sumR += r;
-      sumR2 += r * r;
-    }
-    
-    final avgR = sumR / points.length;
-    final radialVariance = (sumR2 / points.length) - (avgR * avgR);
-    final radialCV = avgR > 0 ? sqrt(radialVariance) / avgR : 0.0;
-    final aspectRatio = min(width, height) / max(width, height);
-
-    // Accept circle on radial fit + aspect alone. The previous corner-
-    // count gate (`notPolygonRange = corners.length < 4 || > 6`)
-    // silently rejected circles drawn from 12 o'clock or 6 o'clock:
-    // Douglas-Peucker on a closure-deduped circle starting from the top
-    // commonly produces 4-6 corners (cardinal-quartet collapse), failing
-    // the gate; the shape then fell through to the rhombus check and
-    // was recognized as a rhombus, looking visually smaller than the
-    // user's stroke. radialCV<0.20 covers natural hand jitter at slow
-    // start/end points (a typical hand-drawn circle has CV in the
-    // 0.10-0.18 range; 0.15 was rejecting top-started ones whose start
-    // density spiked CV slightly). aspectRatio>0.60 is enough to
-    // exclude genuine ovals; further refinement (rectangle disambig)
-    // is handled by the polygon branches that follow when this gate
-    // fails.
-    // ── EDGE-BULGE GATE (circle vs square/rectangle) ──
-    // radialCV + aspect alone can't separate a circle from a SQUARE: a square
-    // has aspect ≈ 1 and a fairly low radial CV, so it used to be recognized
-    // as a circle. The true difference is edge shape — a square's corner-to-
-    // corner edges are STRAIGHT, a circle's are ARCS that bulge away from the
-    // chord. Measure the mean per-edge bulge (max perpendicular deviation of
-    // the stroke from each corner chord, normalised by maxDim):
-    //   • many corners (≥7) ⇒ clearly round, accept regardless;
-    //   • few corners but bulging edges ⇒ a circle drawn from 12/6 o'clock
-    //     (Douglas-Peucker collapses it to 4–6 corners) — still accept;
-    //   • few corners AND straight edges ⇒ a real square/rectangle — REJECT,
-    //     let the polygon branches below classify it.
-    double meanEdgeBulge = 1.0; // default high ⇒ don't reject if mapping fails
-    if (corners.length >= 3) {
-      // Map each corner to its index in `offsets` (DP returns a subsequence).
-      final cornerIdx = <int>[];
-      int searchFrom = 0;
-      for (final c in corners) {
-        for (int j = searchFrom; j < offsets.length; j++) {
-          if (offsets[j] == c) {
-            cornerIdx.add(j);
-            searchFrom = j + 1;
-            break;
-          }
-        }
-      }
-      if (cornerIdx.length == corners.length) {
-        double bulgeSum = 0;
-        int bulgeEdges = 0;
-        for (int k = 0; k < corners.length; k++) {
-          final a = corners[k];
-          final b = corners[(k + 1) % corners.length];
-          final chord = b - a;
-          final chordLen = chord.distance;
-          if (chordLen < 1e-3) continue;
-          final ai = cornerIdx[k];
-          final bi = (k + 1 < corners.length)
-              ? cornerIdx[k + 1]
-              : offsets.length - 1; // closing edge wraps to the path end
-          double maxPerp = 0;
-          for (int j = ai; j <= bi && j < offsets.length; j++) {
-            final v = offsets[j] - a;
-            final perp = (v.dx * chord.dy - v.dy * chord.dx).abs() / chordLen;
-            if (perp > maxPerp) maxPerp = perp;
-          }
-          bulgeSum += maxPerp;
-          bulgeEdges++;
-        }
-        if (bulgeEdges > 0) meanEdgeBulge = (bulgeSum / bulgeEdges) / maxDim;
-      }
-    }
-
-    // 0.04·maxDim of bulge cleanly separates hand-jitter on straight square
-    // edges (~0.01–0.03) from a circle's arc edges (~0.07–0.15).
-    final hasCurvyEdges = corners.length >= 7 || meanEdgeBulge > 0.04;
-    final isCircleCandidate =
-        radialCV < 0.20 && aspectRatio > 0.60 && hasCurvyEdges;
-
-    if (isCircleCandidate) {
-      // Radius is the LARGER of two estimates: half the bigger bbox
-      // dimension, OR the mean point-to-centre distance. When a user
-      // starts from 12/6 o'clock and ergonomically curves back early
-      // before reaching the full bottom/top extent, the bbox shrinks
-      // (undershoots the intended circle) but the mean radius still
-      // reflects the user's curvature — most points sit at the
-      // intended radius even if the bbox doesn't capture the full
-      // diameter. Taking the max of the two estimates absorbs this
-      // asymmetry: perfect circle → both equal, no change; under-
-      // shoot from top/bottom → avgR > bbox/2, use avgR (the user's
-      // curvature wins); slightly-oval drawn fully → bbox/2 ≥ avgR,
-      // bbox/2 wins. Either way the recognized circle never shrinks
-      // below what the user's stroke physically traces.
-      final r = max(max(width, height) / 2, avgR);
-      return ShapeData(
-        shapeType: 'circle',
-        x1: cx - r, y1: cy - r,
-        x2: cx + r, y2: cy + r,
-        strokeColor: color, strokeWidth: visualWidth, isHighlighter: isHighlighter,
-        fillColor: autoFill,
-      );
-    }
-
-    // ── TRIANGLE ──
-    // Preserve the user's apex orientation. The renderer draws an
-    // "apex up" triangle inside the bbox and applies `rotation` around
-    // the bbox centre, so we encode the actual apex direction as a
-    // rotation angle. Without this, every triangle was canonicalised
-    // to apex-up regardless of how the user drew it (op-amps drawn
-    // pointing right became pointing up, etc).
-    if (corners.length == 3) {
-      final centroid = Offset(
-        (corners[0].dx + corners[1].dx + corners[2].dx) / 3,
-        (corners[0].dy + corners[1].dy + corners[2].dy) / 3,
-      );
-      // Apex = the vertex between the two most-equal-length edges (the tip of
-      // an isosceles triangle). This is orientation- AND aspect-independent.
-      // The old "farthest corner from the centroid" heuristic was wrong for
-      // WIDE/flat triangles: a base corner can sit farther from the centroid
-      // than the apex (e.g. a short, wide "roof"), so the detected apex — and
-      // thus the pointing direction — flipped to a base corner. Comparing each
-      // vertex's two adjacent edges instead finds the symmetric tip regardless
-      // of which way (up/down/left/right/oblique) the triangle points.
-      int apexIdx = 0;
-      double bestBalance = double.infinity;
-      for (int i = 0; i < 3; i++) {
-        final e1 = (corners[i] - corners[(i + 2) % 3]).distance;
-        final e2 = (corners[i] - corners[(i + 1) % 3]).distance;
-        final sum = e1 + e2;
-        final balance = sum > 0 ? (e1 - e2).abs() / sum : 1.0;
-        if (balance < bestBalance) {
-          bestBalance = balance;
-          apexIdx = i;
-        }
-      }
-      final apex = corners[apexIdx];
-      // Canvas y is flipped (down=positive). Apex-up corresponds to
-      // angle = -π/2 from centroid. Required rotation to produce the
-      // user's apex direction = (drawn angle) − (canonical −π/2).
-      final drawnAngle =
-          atan2(apex.dy - centroid.dy, apex.dx - centroid.dx);
-      double rotation = drawnAngle + pi / 2;
-      // Normalize to [0, 2π) so the modular snap below is symmetric.
-      while (rotation < 0) { rotation += 2 * pi; }
-      while (rotation >= 2 * pi) { rotation -= 2 * pi; }
-      // Snap aggressively (within ~25°) to the nearest cardinal direction
-      // (0, π/2, π, 3π/2). Hand-drawn triangles vary much more than 11°
-      // (the previous threshold), and a slight tilt almost always means
-      // "the user wanted apex-up but drew at 18°", not "the user
-      // intended a 18° tilt". Cardinal results render cleanly inside
-      // the bbox without rotation transform (see _paintShape).
-      const cardinalSnap = 0.44;  // ~25°
-      final nearestQuarter = (rotation / (pi / 2)).round() * (pi / 2);
-      final isCardinal = (rotation - nearestQuarter).abs() < cardinalSnap;
-      if (isCardinal) {
-        rotation = nearestQuarter % (2 * pi);
-      }
-      // For oblique (non-cardinal) triangles the canonical apex-up +
-      // canvas.rotate path was geometrically wrong: the canonical apex
-      // sat at distance H/2 from bbox center, but the user's actual
-      // apex sat at (corner_to_centroid) distance, generally not H/2.
-      // The rendered apex landed inside or outside the bbox at the
-      // wrong place. Fix: store the user's three actual vertices and
-      // render them directly. On resize, an affine bbox→bbox remap
-      // preserves geometry exactly.
-      final base1 = corners[(apexIdx + 1) % 3];
-      final base2 = corners[(apexIdx + 2) % 3];
-      final vertices = isCardinal
-          ? const <double>[]
-          : <double>[apex.dx, apex.dy, base1.dx, base1.dy, base2.dx, base2.dy];
-      return ShapeData(
-        shapeType: 'triangle',
-        x1: minX, y1: minY, x2: maxX, y2: maxY,
-        rotation: rotation,
-        vertices: vertices,
-        strokeColor: color, strokeWidth: visualWidth, isHighlighter: isHighlighter,
-        fillColor: autoFill,
-      );
-    }
-
-    // ── RHOMBUS (4 corners with roughly equal edge lengths, diamond shape) ──
-    if (corners.length == 4) {
-      // Check if all edge lengths are roughly equal (within 30%)
-      final edgeLengths = <double>[];
-      for (int i = 0; i < 4; i++) {
-        edgeLengths.add((corners[i] - corners[(i + 1) % 4]).distance);
-      }
-      final avgEdge = edgeLengths.reduce((a, b) => a + b) / 4;
-      final edgeVariation = edgeLengths.map((e) => (e - avgEdge).abs() / avgEdge).reduce(max);
-
-      if (edgeVariation < 0.30) {
-        // Check it's more diamond-like than rectangular:
-        // diagonals should be perpendicular (or close to it)
-        final d1 = corners[2] - corners[0]; // diagonal 1
-        final d2 = corners[3] - corners[1]; // diagonal 2
-        final dotProduct = (d1.dx * d2.dx + d1.dy * d2.dy).abs();
-        final d1Len = d1.distance;
-        final d2Len = d2.distance;
-        final cosAngle = (d1Len > 0 && d2Len > 0) ? dotProduct / (d1Len * d2Len) : 1.0;
-
-        // Also check the shape area vs bounding box area ratio
-        // A rhombus fills ~50% of its bounding box, a rectangle fills ~100%
-        double shapeArea = 0;
-        for (int i = 0; i < 4; i++) {
-          final p1 = corners[i];
-          final p2 = corners[(i + 1) % 4];
-          shapeArea += (p1.dx * p2.dy) - (p2.dx * p1.dy);
-        }
-        shapeArea = shapeArea.abs() / 2;
-        final bboxArea = width * height;
-        final fillRatio = bboxArea > 0 ? shapeArea / bboxArea : 1.0;
-
-        // Rhombus: near-perpendicular diagonals OR diamond-like fill ratio (<75%)
-        if (cosAngle < 0.3 || fillRatio < 0.75) {
-          return ShapeData(
-            shapeType: 'rhombus',
-            x1: minX, y1: minY,
-            x2: maxX, y2: maxY,
-            strokeColor: color, strokeWidth: visualWidth, isHighlighter: isHighlighter,
-            fillColor: autoFill,
-          );
-        }
-      }
-    }
-
-    // ── RECTANGLE (With slant/rotation support) ──
-    if (corners.length >= 4 && corners.length <= 6) {
-      double maxEdgeLen = 0;
-      double angle = 0;
-      for (int i = 0; i < corners.length; i++) {
-        final p1 = corners[i];
-        final p2 = corners[(i + 1) % corners.length];
-        final dist = (p1 - p2).distance;
-        if (dist > maxEdgeLen) {
-          maxEdgeLen = dist;
-          angle = atan2(p2.dy - p1.dy, p2.dx - p1.dx);
-        }
-      }
-
-      // Snap-to-cardinal threshold: was 0.2 rad (≈11.5°) which
-      // flattened any rectangle drawn with a small intentional tilt
-      // back to axis-aligned. 0.157 rad ≈ 9°: enough margin for
-      // "tried to draw straight but was a bit off" while preserving
-      // anything visibly tilted as the user intended.
-      final snappedAngle = (angle / (pi / 2)).round() * (pi / 2);
-      if ((angle - snappedAngle).abs() < 0.157) angle = snappedAngle;
-
-      // For axis-aligned rectangles (angle is multiple of π/2), use the
-      // simple bounding box directly. The OBB rotation is only needed for
-      // truly tilted rectangles — using it for axis-aligned ones produces
-      // distorted coordinates that break resize and rendering.
-      final isAxisAligned = (angle % (pi / 2)).abs() < 0.01 || ((angle % (pi / 2)).abs() - pi / 2).abs() < 0.01;
-
-      double rMinX, rMaxX, rMinY, rMaxY;
-      double finalAngle;
-
-      if (isAxisAligned) {
-        // Use raw bounding box — no rotation needed
-        rMinX = minX;
-        rMaxX = maxX;
-        rMinY = minY;
-        rMaxY = maxY;
-        finalAngle = 0;
-      } else {
-        // Tilted rectangle: compute OBB
-        final cosA = cos(-angle);
-        final sinA = sin(-angle);
-        rMinX = double.infinity;
-        rMaxX = double.negativeInfinity;
-        rMinY = double.infinity;
-        rMaxY = double.negativeInfinity;
-
-        for (final p in offsets) {
-          final dx = p.dx - cx;
-          final dy = p.dy - cy;
-          final rx = dx * cosA - dy * sinA;
-          final ry = dx * sinA + dy * cosA;
-          if (rx < rMinX) rMinX = rx;
-          if (rx > rMaxX) rMaxX = rx;
-          if (ry < rMinY) rMinY = ry;
-          if (ry > rMaxY) rMaxY = ry;
-        }
-        // Convert back to page-space
-        rMinX += cx;
-        rMaxX += cx;
-        rMinY += cy;
-        rMaxY += cy;
-        finalAngle = angle;
-      }
-
-      final obbW = rMaxX - (isAxisAligned ? rMinX : rMinX);
-      final obbH = rMaxY - (isAxisAligned ? rMinY : rMinY);
-      final obbArea = obbW * obbH;
-
-      double shapeArea = 0;
-      for (int i = 0; i < corners.length; i++) {
-        final p1 = corners[i];
-        final p2 = corners[(i + 1) % corners.length];
-        shapeArea += (p1.dx * p2.dy) - (p2.dx * p1.dy);
-      }
-      shapeArea = (shapeArea.abs() / 2);
-
-      if (obbArea > 0 && (shapeArea / obbArea) > 0.70) {
-        // Find which corner the pen ended near
-        final endPoint = Offset(points.last.x, points.last.y);
-        final rectCorners = [
-          Offset(rMinX, rMinY), // Top-Left
-          Offset(rMaxX, rMinY), // Top-Right
-          Offset(rMaxX, rMaxY), // Bottom-Right
-          Offset(rMinX, rMaxY), // Bottom-Left
-        ];
-        int closestIdx = 0;
-        double closestDist = double.infinity;
-        for (int i = 0; i < 4; i++) {
-          final d = (rectCorners[i] - endPoint).distance;
-          if (d < closestDist) {
-            closestDist = d;
-            closestIdx = i;
-          }
-        }
-        return ShapeData(
-          shapeType: 'rectangle',
-          x1: rectCorners[(closestIdx + 2) % 4].dx,
-          y1: rectCorners[(closestIdx + 2) % 4].dy,
-          x2: rectCorners[closestIdx].dx,
-          y2: rectCorners[closestIdx].dy,
-          rotation: finalAngle,
-          strokeColor: color, strokeWidth: visualWidth, isHighlighter: isHighlighter,
-          fillColor: autoFill,
-        );
-      }
-    }
-
-    return null;
-  }
-
-  // ── MATHEMATICAL HELPERS ──
-
-  /// Snap line end to nearest common angle if within threshold.
-  /// Snaps to multiples of 15° (0°, 15°, 30°, 45°, 60°, 75°, 90°, …).
-  /// Returns [snappedX2, snappedY2].
-  List<double> _snapLineEnd(double x1, double y1, double x2, double y2) {
-    final dx = x2 - x1;
-    final dy = y2 - y1;
-    final lineLen = sqrt(dx * dx + dy * dy);
-    if (lineLen < 5) return [x2, y2];
-
-    final angle = atan2(dy, dx); // radians
-    // Snap to multiples of 15° (π/12)
-    const snapStep = pi / 12; // 15 degrees
-    const snapThreshold = 0.065; // ~3.7 degrees in radians
-
-    final nearest = (angle / snapStep).round() * snapStep;
-    if ((angle - nearest).abs() < snapThreshold) {
-      return [x1 + lineLen * cos(nearest), y1 + lineLen * sin(nearest)];
-    }
-    return [x2, y2];
-  }
-
-  /// Douglas-Peucker algorithm to reduce complex paths into core geometric vertices
-  List<Offset> _douglasPeucker(List<Offset> points, double epsilon) {
-    if (points.length <= 2) return points;
-
-    double maxDist = 0.0;
-    int index = 0;
-    final end = points.length - 1;
-
-    for (int i = 1; i < end; i++) {
-      final dist = _perpendicularDistance(points[i], points[0], points[end]);
-      if (dist > maxDist) {
-        maxDist = dist;
-        index = i;
-      }
-    }
-
-    if (maxDist > epsilon) {
-      final left = _douglasPeucker(points.sublist(0, index + 1), epsilon);
-      final right = _douglasPeucker(points.sublist(index, end + 1), epsilon);
-      return [...left.sublist(0, left.length - 1), ...right];
-    } else {
-      return [points[0], points[end]];
-    }
-  }
-
-  /// Calculates the shortest distance from a point to a line segment
-  double _perpendicularDistance(Offset pt, Offset lineStart, Offset lineEnd) {
-    final dx = lineEnd.dx - lineStart.dx;
-    final dy = lineEnd.dy - lineStart.dy;
-    final mag = sqrt(dx * dx + dy * dy);
-    
-    if (mag > 0.0) {
-      return ((pt.dx - lineStart.dx) * dy - (pt.dy - lineStart.dy) * dx).abs() / mag;
-    }
-    return (pt - lineStart).distance;
-  }
-
 
   void _addShapeElement(ShapeData shapeData) {
     final s = state!;
@@ -3727,11 +3334,8 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         ]);
         break;
       case 'triangle':
-        final tLeft = min(sh.x1, sh.x2), tRight = max(sh.x1, sh.x2);
-        final top = min(sh.y1, sh.y2), bottom = max(sh.y1, sh.y2);
-        final apex = Offset((tLeft + tRight) / 2, top);
-        final bl = Offset(tLeft, bottom), br = Offset(tRight, bottom);
-        rawEdges.addAll([[apex, bl], [bl, br], [br, apex]]);
+        final tc = triangleCorners(sh);
+        rawEdges.addAll([[tc[0], tc[1]], [tc[1], tc[2]], [tc[2], tc[0]]]);
         break;
       case 'rhombus':
         final rl = min(sh.x1, sh.x2), rr = max(sh.x1, sh.x2);
@@ -3783,7 +3387,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     // Rotation transform
     final cx = (sh.x1 + sh.x2) / 2;
     final cy = (sh.y1 + sh.y2) / 2;
-    final hasRotation = sh.rotation != 0;
+    final hasRotation = sh.rotation != 0 && sh.shapeType != 'triangle';
     final cosA = hasRotation ? cos(sh.rotation) : 1.0;
     final sinA = hasRotation ? sin(sh.rotation) : 0.0;
 
@@ -4925,52 +4529,155 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
   // ── Undo / Redo ──
 
-  void undo() {
-    if (state == null || state!.undoStack.isEmpty) return;
-    final s = state!;
-    final entry = s.undoStack.last;
-    // Entry for a page no longer in the document (removed by a path that
-    // didn't purge the stacks): drop it instead of restoring an orphan
-    // PageData that has no document entry.
-    if (!s.document.pages.any((p) => p.fileName == entry.pageFileName)) {
-      state = s.copyWith(
-          undoStack: List<UndoEntry>.from(s.undoStack)..removeLast());
-      return;
+  /// Index of the newest entry of [stack] that belongs to [fileName].
+  static int _lastEntryFor(List<UndoEntry> stack, String fileName) {
+    for (var i = stack.length - 1; i >= 0; i--) {
+      if (stack[i].pageFileName == fileName) return i;
     }
-    final currentPage = s.pages[entry.pageFileName];
+    return -1;
+  }
 
-    final newUndo = List<UndoEntry>.from(s.undoStack)..removeLast();
-    final newRedo = [...s.redoStack, if (currentPage != null) UndoEntry(entry.pageFileName, currentPage)];
+  /// Dismiss the lasso before a history step so its stale ids/bounds can't
+  /// outlive the page swap. Returns false when an uncommitted move/resize
+  /// is pending and [commitPending] is false (redo must not discard it).
+  bool _settleSelectionForHistory({required bool commitPending}) {
+    final sel = state!.lassoSelection;
+    if (sel == null) return true;
+    final pending = sel.rotation != 0.0 ||
+        sel.dragOffset != Offset.zero ||
+        sel.scale != 1.0;
+    if (pending && !commitPending) return false;
+    if (pending) applySelectionTransform();
+    state = state!.copyWith(clearLasso: true, lassoPath: []);
+    return true;
+  }
 
+  void undo() {
+    if (state == null || state!.document.pages.isEmpty) return;
+    final fileName = state!.currentPageFileName;
+    final sel = state!.lassoSelection;
+    final hasPending = sel != null &&
+        (sel.rotation != 0.0 ||
+            sel.dragOffset != Offset.zero ||
+            sel.scale != 1.0);
+    if (!hasPending && _lastEntryFor(state!.undoStack, fileName) < 0) return;
+    _settleSelectionForHistory(commitPending: true);
+    final s = state!;
+    final idx = _lastEntryFor(s.undoStack, fileName);
+    if (idx < 0) return;
+    final entry = s.undoStack[idx];
+    final newUndo = List<UndoEntry>.from(s.undoStack)..removeAt(idx);
+    final currentPage = s.pages[fileName];
+    final newRedo = [
+      ...s.redoStack,
+      if (currentPage != null) UndoEntry(fileName, currentPage),
+    ];
     final updatedPages = Map<String, PageData>.from(s.pages);
-    updatedPages[entry.pageFileName] = entry.pageData;
-
-    state = s.copyWith(pages: updatedPages, undoStack: newUndo, redoStack: newRedo, isDirty: true);
+    updatedPages[fileName] = entry.pageData;
+    state = s.copyWith(
+        pages: updatedPages,
+        undoStack: newUndo,
+        redoStack: newRedo,
+        isDirty: true);
   }
 
   void redo() {
-    if (state == null || state!.redoStack.isEmpty) return;
+    if (state == null || state!.document.pages.isEmpty) return;
+    final fileName = state!.currentPageFileName;
+    if (_lastEntryFor(state!.redoStack, fileName) < 0) return;
+    if (!_settleSelectionForHistory(commitPending: false)) return;
     final s = state!;
-    final entry = s.redoStack.last;
-    // Same orphan guard as undo().
-    if (!s.document.pages.any((p) => p.fileName == entry.pageFileName)) {
-      state = s.copyWith(
-          redoStack: List<UndoEntry>.from(s.redoStack)..removeLast());
-      return;
-    }
-    final currentPage = s.pages[entry.pageFileName];
-
-    final newRedo = List<UndoEntry>.from(s.redoStack)..removeLast();
-    final newUndo = [...s.undoStack, if (currentPage != null) UndoEntry(entry.pageFileName, currentPage)];
-
+    final idx = _lastEntryFor(s.redoStack, fileName);
+    if (idx < 0) return;
+    final entry = s.redoStack[idx];
+    final newRedo = List<UndoEntry>.from(s.redoStack)..removeAt(idx);
+    final currentPage = s.pages[fileName];
+    final newUndo = [
+      ...s.undoStack,
+      if (currentPage != null) UndoEntry(fileName, currentPage),
+    ];
     final updatedPages = Map<String, PageData>.from(s.pages);
-    updatedPages[entry.pageFileName] = entry.pageData;
-
-    state = s.copyWith(pages: updatedPages, undoStack: newUndo, redoStack: newRedo, isDirty: true);
+    updatedPages[fileName] = entry.pageData;
+    state = s.copyWith(
+        pages: updatedPages,
+        undoStack: newUndo,
+        redoStack: newRedo,
+        isDirty: true);
   }
 
-  bool get canUndo => state != null && state!.undoStack.isNotEmpty;
-  bool get canRedo => state != null && state!.redoStack.isNotEmpty;
+  /// Folds into every undo/redo snapshot of a page what a sync merge changed
+  /// in it (elements added/removed/replaced by the other device), so undoing
+  /// a local step never rolls the other device's work back.
+  static List<UndoEntry> rebaseHistoryOnMerge(List<UndoEntry> stack,
+      Map<String, PageData> before, Map<String, PageData> after) {
+    if (stack.isEmpty) return stack;
+    String idOf(ContentElement e) => e.map(
+        stroke: (s) => s.id,
+        text: (t) => t.id,
+        image: (i) => i.id,
+        shape: (s) => s.id,
+        math: (m) => m.id);
+    final deltas = <String, ({
+      Set<String> removed,
+      List<ContentElement> added,
+      Map<String, ContentElement> changed,
+      BackgroundLayer? background,
+    })>{};
+    for (final fn in after.keys) {
+      final b = before[fn];
+      final a = after[fn];
+      if (b == null || a == null || identical(b, a)) continue;
+      final bById = {for (final e in b.layers.content) idOf(e): e};
+      final aById = {for (final e in a.layers.content) idOf(e): e};
+      final removed = bById.keys.where((id) => !aById.containsKey(id)).toSet();
+      final added = [
+        for (final e in a.layers.content)
+          if (!bById.containsKey(idOf(e))) e,
+      ];
+      final changed = {
+        for (final e in aById.entries)
+          if (bById[e.key] != null && bById[e.key] != e.value) e.key: e.value,
+      };
+      final bg = b.layers.background != a.layers.background
+          ? a.layers.background
+          : null;
+      if (removed.isEmpty && added.isEmpty && changed.isEmpty && bg == null) {
+        continue;
+      }
+      deltas[fn] =
+          (removed: removed, added: added, changed: changed, background: bg);
+    }
+    if (deltas.isEmpty) return stack;
+    return [
+      for (final entry in stack)
+        if (deltas[entry.pageFileName] case final d?)
+          UndoEntry(entry.pageFileName, () {
+            final page = entry.pageData;
+            final ids = {for (final e in page.layers.content) idOf(e)};
+            final content = <ContentElement>[
+              for (final e in page.layers.content)
+                if (!d.removed.contains(idOf(e))) d.changed[idOf(e)] ?? e,
+              for (final e in d.added)
+                if (!ids.contains(idOf(e))) e,
+            ];
+            return page.copyWith(
+                layers: RenderingLayers(
+                    background: d.background ?? page.layers.background,
+                    content: content));
+          }())
+        else
+          entry,
+    ];
+  }
+
+  bool get canUndo =>
+      state != null &&
+      state!.document.pages.isNotEmpty &&
+      _lastEntryFor(state!.undoStack, state!.currentPageFileName) >= 0;
+  bool get canRedo =>
+      state != null &&
+      state!.document.pages.isNotEmpty &&
+      _lastEntryFor(state!.redoStack, state!.currentPageFileName) >= 0;
 
   // ── Page management ──
 
@@ -5586,14 +5293,23 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final undoStack = _pushUndo(s, fileName, page);
 
     final fittedWidth = _measureTextWidth(content, spans, fontSize, width);
+    final fittedHeight =
+        _measureTextHeight(content, spans, fontSize, fittedWidth);
+    // Keep a new box on the page (a tap near the right edge ran off it).
+    final x = s.isScratch
+        ? position.dx
+        : position.dx.clamp(0.0, max(0.0, page.width - fittedWidth)).toDouble();
+    final y = s.isScratch
+        ? position.dy
+        : position.dy.clamp(0.0, max(0.0, page.height - fittedHeight)).toDouble();
 
     final newElement = ContentElement.text(
       id: const Uuid().v4(),
       zIndex: _nextZIndex(page),
       data: TextData(
-        x: position.dx, y: position.dy,
+        x: x, y: y,
         width: fittedWidth,
-        height: _measureTextHeight(content, spans, fontSize, fittedWidth),
+        height: fittedHeight,
         content: content,
         spans: spans,
         fontSize: fontSize,
@@ -6493,7 +6209,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   /// Returns the asset id the image was stored under (`null` if no current
   /// page). PDF import uses the returned id to tie an extracted text layer
   /// back to its raster (see [setPageTextLayer]).
-  String? addImageElement(Offset position, String fileName, Uint8List bytes, double width, double height, {bool locked = false}) {
+  String? addImageElement(Offset position, String fileName, Uint8List bytes, double width, double height, {bool locked = false, ({double w, double h})? pdfSizePt}) {
     if (state == null) return null;
     final s = state!;
     final page = s.currentPage;
@@ -6516,6 +6232,8 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         width: width, height: height,
         assetPath: assetId,
         locked: locked,
+        pdfWidthPt: pdfSizePt?.w,
+        pdfHeightPt: pdfSizePt?.h,
       ),
     );
 
@@ -6574,6 +6292,39 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final updatedPages = Map<String, PageData>.from(s.pages);
     updatedPages[pageFileName] = page.copyWith(pdfTextLayer: layer);
     state = s.copyWith(pages: updatedPages, isDirty: true);
+  }
+
+  /// Resize a page (and its document entry) and make its paper blank. PDF
+  /// import calls it so a page takes the source PDF page's shape instead of
+  /// letterboxing it on A4 ruling.
+  void setPageGeometry(String pageFileName, double width, double height,
+      {bool blankPaper = true}) {
+    if (state == null) return;
+    final s = state!;
+    final page = s.pages[pageFileName];
+    if (page == null) return;
+    final bg = blankPaper
+        ? page.layers.background.copyWith(type: 'blank')
+        : page.layers.background;
+    final updatedPages = Map<String, PageData>.from(s.pages);
+    updatedPages[pageFileName] = page.copyWith(
+      width: width,
+      height: height,
+      layers: page.layers.copyWith(background: bg),
+    );
+    final entries = [
+      for (final e in s.document.pages)
+        e.fileName == pageFileName ? e.copyWith(width: width, height: height) : e,
+    ];
+    state = s.copyWith(
+      pages: updatedPages,
+      document: DocumentStructure(
+        notebookId: s.document.notebookId,
+        formatVersion: s.document.formatVersion,
+        pages: entries,
+      ),
+      isDirty: true,
+    );
   }
 
   /// Asset IDs that have been classified as corrupt (decoding failed,
@@ -7348,9 +7099,9 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   }
 
   /// Returns the first library, or creates a default one if none exists.
-  SymbolLibrary _defaultLibrary() {
+  SymbolLibrary _defaultLibrary(String name) {
     if (state!.symbolLibraries.isEmpty) {
-      final lib = SymbolLibrary(id: const Uuid().v4(), name: 'Simboli');
+      final lib = SymbolLibrary(id: const Uuid().v4(), name: name);
       state = state!.copyWith(symbolLibraries: [lib], isDirty: true);
       _publishSymbols();
       return lib;
@@ -7420,7 +7171,8 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
   /// Creates a symbol from the current lasso selection and adds it to the
   /// target library (first library if [targetLibId] is null).
-  void createSymbolFromSelection(String name, {String? targetLibId}) {
+  void createSymbolFromSelection(String name,
+      {String? targetLibId, required String defaultLibraryName}) {
     if (state == null || state!.lassoSelection == null) return;
     final sel = state!.lassoSelection!;
     final page = state!.currentPage;
@@ -7442,7 +7194,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     );
 
     // Ensure there is at least one library
-    _defaultLibrary();
+    _defaultLibrary(defaultLibraryName);
 
     final targetId = targetLibId ?? state!.symbolLibraries.first.id;
     state = state!.copyWith(
@@ -7455,7 +7207,8 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     _publishSymbols();
   }
 
-  void createSymbolFromElement(String elementId, String name) {
+  void createSymbolFromElement(String elementId, String name,
+      {required String defaultLibraryName}) {
     if (state == null) return;
     final page = state!.currentPage;
     if (page == null) return;
@@ -7477,7 +7230,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       createdAt: DateTime.now(),
     );
 
-    _defaultLibrary();
+    _defaultLibrary(defaultLibraryName);
     final targetId = state!.symbolLibraries.first.id;
     state = state!.copyWith(
       symbolLibraries: state!.symbolLibraries.map((l) {
@@ -8309,10 +8062,16 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
     final newEntry = PageEntry(pageId: pageId, pageNumber: pageNum, fileName: fileName, lastModified: now, chapterId: entry.chapterId);
 
+    // Land right after the source page, like addPage does.
+    final pageList = List<PageEntry>.from(s.document.pages)
+      ..insert(index + 1, newEntry);
+    for (int i = 0; i < pageList.length; i++) {
+      pageList[i] = pageList[i].copyWith(pageNumber: i + 1);
+    }
     final updatedDoc = DocumentStructure(
       notebookId: s.document.notebookId,
       formatVersion: s.document.formatVersion,
-      pages: [...s.document.pages, newEntry],
+      pages: pageList,
     );
 
     final updatedPages = Map<String, PageData>.from(s.pages);
@@ -8321,7 +8080,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     state = s.copyWith(
       document: updatedDoc,
       pages: updatedPages,
-      currentPageIndex: pageNum - 1,
+      currentPageIndex: index + 1,
       metadata: s.metadata.copyWith(pageCount: pageNum, modifiedAt: now),
       isDirty: true,
     );
@@ -8454,6 +8213,10 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
 
   void resetZoom() {
     if (state == null) return;
+    if (state!.isScratch) {
+      fitToContent();
+      return;
+    }
     state = state!.copyWith(zoom: 2.0, panOffset: _centeredPanOffset(2.0));
   }
 
@@ -8464,21 +8227,23 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final s = state;
     final vp = _viewportSize;
     if (s == null || vp == null) return;
+    if (s.isScratch) {
+      fitToContent();
+      return;
+    }
     final page = s.currentPage;
     if (page == null) return;
-    // Fit entire page height with a small margin; width fits automatically
-    // because pages are narrower than the viewport on desktop/iPad.
+    // zoom is relative to the viewport-fit scale of the page (zoom 1 = page
+    // fills the viewport), so the margin-fit zoom is expressed against it.
     const margin = 24.0;
-    final zoomH = (vp.height - margin * 2) / page.height;
-    final zoomW = (vp.width - margin * 2) / page.width;
-    final target = zoomH < zoomW ? zoomH : zoomW;
-    final newZoom = target.clamp(0.3, 5.0);
-    // Horizontally center: same rule as _centeredPanOffset but with margin.
-    final panX = (vp.width - page.width * newZoom) / 2;
-    final panY = (vp.height - page.height * newZoom) / 2;
+    final fit = min(vp.width / page.width, vp.height / page.height);
+    final target = min((vp.width - margin * 2) / page.width,
+        (vp.height - margin * 2) / page.height);
+    final newZoom = (target / fit).clamp(0.3, 5.0).toDouble();
+    _bumpInteract();
     state = s.copyWith(
       zoom: newZoom,
-      panOffset: Offset(panX, panY),
+      panOffset: Offset(vp.width, vp.height) * ((1 - newZoom) / 2),
     );
   }
 
@@ -8597,6 +8362,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final updatedMeta = s.metadata.copyWith(
       modifiedAt: DateTime.now(),
       pageCount: s.document.pages.length,
+      chapters: _chaptersWithMembership(s.metadata.chapters, s.document),
     );
 
     // ── Detect which pages actually changed (identity comparison) ──
@@ -8851,6 +8617,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
           _remoteRetryTimer?.cancel();
           _recomputeSyncStatus();
         }
+        _movedChecks = 0;
         // The full chain (pages + document + metadata) just landed,
         // so any pending metadata-only retry is now stale: the bytes
         // queued by an earlier failed save committed something the
@@ -8927,7 +8694,29 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         try {
           await fileService.markNotebookDirty(updatedMeta.id);
         } catch (_) {}
+      } on _ServerMovedException {
+        debugPrint('[Canvas] Server changed since the last pull — merging '
+            'before pushing');
+        try {
+          await fileService.markNotebookDirty(updatedMeta.id);
+          await fileService.addDirtyPages(updatedMeta.id, [
+            ...changedPages.keys,
+            for (final k in snapshotDirtyAssetKeys) 'asset:$k',
+            'doc',
+          ]);
+          await _persistUnpushedBase(updatedMeta.id);
+        } catch (_) {}
+        _pullThenPush();
+      } on _RemoteGoneException {
+        await _onRemoteNotebookGone();
       } catch (e) {
+        final cause = e is MetadataCommitFailedException ? e.cause : e;
+        if (cause is RemoteStoreException &&
+            (cause.statusCode == 404 || cause.statusCode == 409) &&
+            await _remoteNotebookGone(syncService)) {
+          await _onRemoteNotebookGone();
+          return;
+        }
         debugPrint('[Canvas] Remote sync deferred (offline?): $e');
         if (e is RemoteStorageFullException) _reportStorageFull(true);
         _consecutiveSyncFailures++;
@@ -8998,6 +8787,128 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     }
   }
 
+  /// Pre-push checks that found the server moved, in a row. After
+  /// [_maxMovedChecks] the push goes ahead so a pull that never settles the
+  /// difference cannot starve the upload.
+  int _movedChecks = 0;
+  static const int _maxMovedChecks = 3;
+
+  /// The upload overwrites whole page files, so it must start from what the
+  /// server holds now: when another device pushed since our last pull, throw
+  /// [_ServerMovedException] and let the pull's 3-way merge run first.
+  Future<void> _ensureServerUnchanged(
+      SyncService sync, String id, List<String> dirtyFns) async {
+    if (_movedChecks >= _maxMovedChecks) return;
+    final known = dirtyFns.where((fn) => _lastPageEtags[fn] != null).toList();
+    if (known.isEmpty && _remoteMetaEtag == null) {
+      // Never pushed from here: if the server held it before, it is gone now.
+      if (await _remoteNotebookGone(sync)) throw _RemoteGoneException();
+      return;
+    }
+    var moved = false;
+    try {
+      if (known.isNotEmpty && known.length <= 16) {
+        final now = await sync.getPageVersions(id, known);
+        if (now.values.every((v) => v == null) &&
+            await _remoteNotebookGone(sync)) {
+          throw _RemoteGoneException();
+        }
+        moved = now.entries.any((e) => e.value != _lastPageEtags[e.key]);
+      }
+      if (!moved && _remoteMetaEtag != null) {
+        final meta = await sync.getDeltaMetaEtag(id);
+        if (meta == null && await _remoteNotebookGone(sync)) {
+          throw _RemoteGoneException();
+        }
+        moved = meta != null && meta != _remoteMetaEtag;
+      }
+    } on _RemoteGoneException {
+      rethrow;
+    } catch (_) {
+      return; // can't tell: the upload itself will fail or succeed
+    }
+    if (moved) {
+      _movedChecks++;
+      throw _ServerMovedException();
+    }
+  }
+
+  /// Merge what the other device pushed, then push the merge.
+  void _pullThenPush() {
+    unawaited(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      if (_disposed || state == null) return;
+      _pagePropfindCounter = _propfindSafetyNetEvery; // force a full listing
+      await _pullRemoteChanges();
+      _retryUnpushed();
+    }());
+  }
+
+  /// This device has seen the notebook on the server: a delta ETag, or the
+  /// root file's ETag recorded when it was downloaded or uploaded.
+  Future<bool> _wasOnServer(String id) async {
+    if (_remoteMetaEtag != null || _lastPageEtags.isNotEmpty) return true;
+    try {
+      final row = await _ref.read(fileServiceProvider).getNotebookMeta(id);
+      return row?['etag'] != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// The notebook was on the server and its root file and folder
+  /// are both gone: another device deleted it. Anything else (network, auth,
+  /// a half-written upload) answers false.
+  Future<bool> _remoteNotebookGone(SyncService sync) async {
+    final st = state;
+    if (st == null || !await _wasOnServer(st.metadata.id)) return false;
+    try {
+      if (await sync.deltaFolderExists(st.metadata.id, fresh: true)) {
+        return false;
+      }
+      final root = st.remotePath;
+      return root.isEmpty || await sync.remoteFileAbsent(root);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Keeps the notebook on this device only, instead of recreating a folder
+  /// nobody can find: the user's edits stay, the indicators say so, and
+  /// resuming sync from the library uploads it again on purpose.
+  Future<void> _onRemoteNotebookGone() async {
+    final st = state;
+    if (st == null) return;
+    final id = st.metadata.id;
+    final files = _ref.read(fileServiceProvider);
+    await files.setNotebookLocalOnly(id, true);
+    await files.clearDirtyPages(id);
+    _localOnlyCache[id] = true;
+    keptLocal.value = true;
+    _remoteRetryTimer?.cancel();
+    _pendingMetaCommitBytes = null;
+    _pendingMetaCommitTimer?.cancel();
+    _pendingMetaCommitTimer = null;
+    _pendingPageDeletes.clear();
+    _pendingAssetDeletes.clear();
+    _remoteMetaEtag = null;
+    _lastPageEtags = {};
+    _consecutiveSyncFailures = 0;
+    _pullUnreachable = false;
+    _recomputeSyncStatus();
+    await _persistPendingDeletes(id);
+    await _persistPendingMetaCommit(id, null);
+    await _clearUnpushedBase(id);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_deltaMetaEtagPrefsKey(id));
+      await prefs.remove(_pageEtagsPrefsKey(id));
+    } catch (_) {}
+    unawaited(CrashLogger.append('[Sync] $id deleted on the server: kept '
+        'on this device only'));
+    _ref.read(notebookListProvider.notifier).noteDeletedElsewhere(id);
+  }
+
   Future<void> _remoteSync({
     required SyncService syncService,
     required dynamic fileService,
@@ -9040,8 +8951,21 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     if (syncService.isOffline || await _isLocalOnly(updatedMeta.id)) {
       debugPrint('[Canvas] Skipping delta sync for ${updatedMeta.id} — '
           'notebook is kept on this device only');
+      // Remember what the server never got: reconnecting or resuming sync
+      // pushes it, instead of reading the local copy as already uploaded.
+      try {
+        await fileService.addDirtyPages(updatedMeta.id, [
+          ...dirtyPages.keys,
+          for (final k in dirtyAssets?.keys ?? const <String>[]) 'asset:$k',
+          'doc',
+        ]);
+        await _persistUnpushedBase(updatedMeta.id);
+      } catch (_) {}
       return;
     }
+
+    await _ensureServerUnchanged(
+        syncService, updatedMeta.id, dirtyPages.keys.toList());
 
     debugPrint('[Canvas] Starting delta sync: ${dirtyPages.length} pages '
         '(retrying ${_pendingPageDeletes.length} pending page deletes, '
@@ -9412,6 +9336,10 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
       if (fastMetaEtag != null) {
         _onRemoteReachable();
       } else if (_remoteMetaEtag != null && !_pullUnreachable) {
+        if (await _remoteNotebookGone(syncService)) {
+          await _onRemoteNotebookGone();
+          return;
+        }
         _pullUnreachable = true;
         _reportReachable(false);
         _recomputeSyncStatus();
@@ -9424,6 +9352,10 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
               await syncService.getRemoteChangeState(pullNotebookId);
         } on WebDavException catch (e) {
           if (e.statusCode == 404) {
+            if (await _remoteNotebookGone(syncService)) {
+              await _onRemoteNotebookGone();
+              return;
+            }
             // Remote .sync/<id>/ doesn't exist yet — a freshly created
             // notebook that has never been pushed. Nothing to pull; the
             // first save() will create the folder. Count as an idle tick
@@ -11068,6 +11000,8 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     _uploadedAssetKeys.addAll(pending.assets.keys);
 
     state = s.copyWith(
+      undoStack: rebaseHistoryOnMerge(s.undoStack, s.pages, mergedPages),
+      redoStack: rebaseHistoryOnMerge(s.redoStack, s.pages, mergedPages),
       metadata: finalMeta,
       document: finalDoc,
       pages: mergedPages,
@@ -11374,6 +11308,8 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         : s.currentPageIndex.clamp(0, updatedDoc.pages.length - 1);
 
     state = s.copyWith(
+      undoStack: rebaseHistoryOnMerge(s.undoStack, s.pages, updatedPages),
+      redoStack: rebaseHistoryOnMerge(s.redoStack, s.pages, updatedPages),
       pages: updatedPages,
       document: updatedDoc,
       currentPageIndex: newIndex,
@@ -11839,3 +11775,9 @@ TransferableTypedData _buildPackageInIsolate(_PackageParams p) {
   return TransferableTypedData.fromList([bytes]);
 }
 
+
+/// The server changed under a push; the caller merges first.
+class _ServerMovedException implements Exception {}
+
+/// The server no longer holds the notebook.
+class _RemoteGoneException implements Exception {}

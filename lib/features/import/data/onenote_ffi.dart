@@ -60,7 +60,7 @@ class OneNoteBridge {
     final lib = _load();
     if (lib == null) {
       throw const FormatException(
-          'bridge OneNote non disponibile su questa piattaforma');
+          'bridge OneNote unavailable on this platform');
     }
     final parse = lib.lookupFunction<
         Pointer<Utf8> Function(Pointer<Utf8>),
@@ -74,7 +74,7 @@ class OneNoteBridge {
     try {
       resultPtr = parse(pathPtr);
       if (resultPtr == nullptr) {
-        throw const FormatException('bridge OneNote: risposta nulla');
+        throw const FormatException('bridge OneNote: null response');
       }
       final jsonStr = resultPtr.toDartString();
       final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;

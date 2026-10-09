@@ -34,11 +34,15 @@ class PenMonitorInfo {
   String get geometry => '$width×$height @ ($x, $y)';
 }
 
+enum PenMonitorError { toolMissing, toolFailed, noMonitor, noPen, badGeometry }
+
 class PenMonitorException implements Exception {
-  final String message;
-  PenMonitorException(this.message);
+  final PenMonitorError error;
+  final String? tool;
+  final String? detail;
+  PenMonitorException(this.error, {this.tool, this.detail});
   @override
-  String toString() => message;
+  String toString() => 'PenMonitorException: ${error.name} $tool $detail';
 }
 
 class PenMonitorService {
@@ -86,10 +90,12 @@ class PenMonitorService {
     try {
       res = await Process.run('xrandr', const ['--query']);
     } on ProcessException catch (e) {
-      throw PenMonitorException('xrandr non trovato: ${e.message}');
+      throw PenMonitorException(PenMonitorError.toolMissing,
+          tool: 'xrandr', detail: e.message);
     }
     if (res.exitCode != 0) {
-      throw PenMonitorException('xrandr ha fallito: ${res.stderr}');
+      throw PenMonitorException(PenMonitorError.toolFailed,
+          tool: 'xrandr', detail: '${res.stderr}');
     }
     final out = '${res.stdout}';
     final monitors = <PenMonitorInfo>[];
@@ -105,7 +111,7 @@ class PenMonitorService {
       ));
     }
     if (monitors.isEmpty) {
-      throw PenMonitorException('Nessun monitor attivo rilevato.');
+      throw PenMonitorException(PenMonitorError.noMonitor);
     }
     return monitors;
   }
@@ -116,7 +122,8 @@ class PenMonitorService {
     try {
       res = await Process.run('xinput', const ['list', '--name-only']);
     } on ProcessException catch (e) {
-      throw PenMonitorException('xinput non trovato: ${e.message}');
+      throw PenMonitorException(PenMonitorError.toolMissing,
+          tool: 'xinput', detail: e.message);
     }
     if (res.exitCode != 0) return null;
     for (final line in '${res.stdout}'.split('\n')) {
@@ -141,8 +148,7 @@ class PenMonitorService {
   ) async {
     final pen = await findPenDevice();
     if (pen == null) {
-      throw PenMonitorException(
-          'Nessun dispositivo penna trovato (stylus/pen/wacom).');
+      throw PenMonitorException(PenMonitorError.noPen);
     }
 
     var totalW = 0;
@@ -152,7 +158,7 @@ class PenMonitorService {
       totalH = math.max(totalH, m.y + m.height);
     }
     if (totalW <= 0 || totalH <= 0) {
-      throw PenMonitorException('Geometria desktop non valida.');
+      throw PenMonitorException(PenMonitorError.badGeometry);
     }
 
     final matrix = <double>[
@@ -168,7 +174,7 @@ class PenMonitorService {
   Future<void> resetPen() async {
     final pen = await findPenDevice();
     if (pen == null) {
-      throw PenMonitorException('Nessun dispositivo penna trovato.');
+      throw PenMonitorException(PenMonitorError.noPen);
     }
     await _setMatrix(
         pen, const ['1', '0', '0', '0', '1', '0', '0', '0', '1']);
@@ -184,10 +190,12 @@ class PenMonitorService {
         ...matrix,
       ]);
     } on ProcessException catch (e) {
-      throw PenMonitorException('xinput non trovato: ${e.message}');
+      throw PenMonitorException(PenMonitorError.toolMissing,
+          tool: 'xinput', detail: e.message);
     }
     if (res.exitCode != 0) {
-      throw PenMonitorException('xinput set-prop ha fallito: ${res.stderr}');
+      throw PenMonitorException(PenMonitorError.toolFailed,
+          tool: 'xinput', detail: '${res.stderr}');
     }
   }
 }

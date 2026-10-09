@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:abelnotes/features/import/data/import_models.dart';
+import 'package:abelnotes/features/import/presentation/import_messages.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
 
@@ -35,7 +36,7 @@ Future<void> showImportReportDialog(
                     Text(issue.source,
                         style: const TextStyle(
                             fontSize: 11, fontWeight: FontWeight.w600)),
-                    Text(issue.message,
+                    Text(importIssueText(l10n, issue),
                         style: TextStyle(fontSize: 12, color: color)),
                   ],
                 ),
@@ -48,7 +49,7 @@ Future<void> showImportReportDialog(
         TextButton(
           onPressed: () {
             final text = report.issues
-                .map((i) => '[${i.severity.name}] ${i.source}: ${i.message}')
+                .map((i) => '[${i.severity.name}] ${i.source}: ${importIssueText(l10n, i)}')
                 .join('\n');
             Clipboard.setData(ClipboardData(text: text));
           },

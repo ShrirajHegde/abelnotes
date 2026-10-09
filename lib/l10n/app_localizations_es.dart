@@ -1344,11 +1344,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get setTrashEmptyState => 'La papelera está vacía.';
 
   @override
-  String setTrashDeletedAgo(String time) {
-    return 'Eliminado hace $time';
-  }
-
-  @override
   String get setTrashRestore => 'Restaurar';
 
   @override
@@ -2647,4 +2642,383 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get setLanguageChinese => '中文';
+
+  @override
+  String get qlTrashDeletedNow => 'Eliminado ahora mismo';
+
+  @override
+  String qlTrashDeletedMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Eliminado hace $count minutos',
+      one: 'Eliminado hace $count minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qlTrashDeletedHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Eliminado hace $count horas',
+      one: 'Eliminado hace $count hora',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qlTrashDeletedDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Eliminado hace $count días',
+      one: 'Eliminado hace $count día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qlAdvancedLocalOnly =>
+      'Estas herramientas de recuperación solo se aplican cuando hay un servidor o Google Drive conectado.';
+
+  @override
+  String get qlNameRequired => 'Introduce un nombre';
+
+  @override
+  String get qlDuplicate => 'Duplicar';
+
+  @override
+  String qlDuplicateTitle(String title) {
+    return '$title (copia)';
+  }
+
+  @override
+  String get qlDuplicated => 'Cuaderno duplicado';
+
+  @override
+  String get qlDuplicateNoLocalCopy =>
+      'Este cuaderno no está en este dispositivo. Ábrelo una vez para descargarlo y luego duplícalo.';
+
+  @override
+  String get qlDeleteOrphanBody =>
+      'No queda ninguna copia de este cuaderno en este dispositivo, así que no se podrá restaurar. Se quitará de la biblioteca.';
+
+  @override
+  String get qlDeletedNoTrash =>
+      'Quitado. No había ninguna copia en este dispositivo, así que nada fue a la papelera.';
+
+  @override
+  String get qlOpenCorrupt =>
+      'Los datos de este cuaderno están dañados y no se pueden abrir.';
+
+  @override
+  String qlSearchNoResults(String query) {
+    return 'Ningún cuaderno coincide con «$query».';
+  }
+
+  @override
+  String get qcMouseSelectHint =>
+      'El ratón selecciona mientras hay un lápiz activo. Activa el dibujo con ratón para dibujar con él.';
+
+  @override
+  String get qcMouseDrawEnable => 'Dibujar con ratón';
+
+  @override
+  String qiIssueRemoteImage(String arg) {
+    return 'Imagen remota no descargada: $arg';
+  }
+
+  @override
+  String qiIssueImageNotFound(String arg) {
+    return 'Imagen no encontrada: $arg';
+  }
+
+  @override
+  String qiIssueImageUnreadable(String arg) {
+    return 'No se pudo leer la imagen: $arg';
+  }
+
+  @override
+  String qiIssueAttachmentUnsupported(String arg) {
+    return 'Adjunto no compatible (solo imágenes): $arg';
+  }
+
+  @override
+  String qiIssueAttachmentTooLarge(String arg) {
+    return 'Adjunto demasiado grande, omitido: $arg';
+  }
+
+  @override
+  String qiIssueEmbedUnsupported(String arg) {
+    return 'Archivo incrustado no importado (solo imágenes y notas): $arg';
+  }
+
+  @override
+  String qiIssueNoteEmbedNotFound(String arg) {
+    return 'Nota incrustada no encontrada: $arg';
+  }
+
+  @override
+  String qiIssueNoteEmbedSkipped(String arg) {
+    return 'Nota incrustada no expandida (circular o demasiado anidada): $arg';
+  }
+
+  @override
+  String get qiIssueFileUnreadable => 'No se pudo leer el archivo';
+
+  @override
+  String qiIssueFileTooLarge(int count) {
+    return 'Archivo demasiado grande ($count MB), omitido';
+  }
+
+  @override
+  String get qiIssueEncodingFallback =>
+      'El texto no era UTF-8 válido, se leyó como Latin-1';
+
+  @override
+  String get qiIssueCsvUnreadable => 'No se pudo leer la tabla';
+
+  @override
+  String qiIssueZipEntryTooLarge(int count) {
+    return 'Elemento del archivo demasiado grande ($count MB), omitido';
+  }
+
+  @override
+  String qiIssueZipTotalTooLarge(int count) {
+    return 'El contenido del archivo supera $count MB, se omitieron los archivos restantes';
+  }
+
+  @override
+  String qiIssueHiddenFolders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Se omitieron $count notas en carpetas ocultas',
+      one: 'Se omitió 1 nota en una carpeta oculta',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qiIssueTooManyChapters(int count) {
+    return '$count capítulos: considera importar las subcarpetas por separado';
+  }
+
+  @override
+  String qiIssuePagesTruncated(int count) {
+    return 'Nota cortada tras $count páginas';
+  }
+
+  @override
+  String qiIssueOneNoteSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos no compatibles omitidos',
+      one: '1 elemento no compatible omitido',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qiErrNoMarkdown =>
+      'No hay archivos Markdown (.md) en la carpeta elegida';
+
+  @override
+  String get qiErrNoNotionContent =>
+      'El zip no contiene archivos .md ni .csv: usa una exportación de Notion «Markdown y CSV»';
+
+  @override
+  String get qiErrNothingImportable => 'No se encontró nada importable';
+
+  @override
+  String get qiErrZipUnreadable =>
+      'El archivo zip está dañado o no es un archivo válido';
+
+  @override
+  String get qiErrNoOneNotePages =>
+      'No hay páginas importables en este archivo';
+
+  @override
+  String get qiErrUnexpected => 'error inesperado';
+
+  @override
+  String qiOneNoteSection(int n) {
+    return 'Sección $n';
+  }
+
+  @override
+  String get qiOneNotePage => 'Página';
+
+  @override
+  String get qiPdfNotPdf => 'Este archivo no es un PDF válido';
+
+  @override
+  String get qiPdfCorrupt =>
+      'Este PDF está dañado o incompleto y no se puede leer';
+
+  @override
+  String get qiPdfEmpty => 'Este PDF no tiene páginas';
+
+  @override
+  String get qiPdfUnsupported =>
+      'Este PDF usa una protección o función no compatible';
+
+  @override
+  String get qiPdfPasswordCancelled =>
+      'Importación cancelada: no se indicó contraseña';
+
+  @override
+  String get qiPdfImportFailed => 'No se pudo importar el PDF';
+
+  @override
+  String get qiPdfPasswordTitle => 'PDF protegido con contraseña';
+
+  @override
+  String get qiPdfPasswordBody =>
+      'Introduce la contraseña para importar este PDF.';
+
+  @override
+  String get qiPdfPasswordHint => 'Contraseña';
+
+  @override
+  String get qiPdfPasswordWrong => 'Contraseña incorrecta, inténtalo de nuevo';
+
+  @override
+  String get qiPdfPasswordOpen => 'Abrir';
+
+  @override
+  String qiPdfPageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'El PDF tiene $count páginas.',
+      one: 'El PDF tiene 1 página.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qiPdfStartOutOfRange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'El PDF tiene $count páginas. El inicio está fuera de rango.',
+      one: 'El PDF tiene 1 página. El inicio está fuera de rango.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qsReauthBanner =>
+      'El servidor ya no acepta tu inicio de sesión. Tus cambios están a salvo en este dispositivo y se sincronizarán cuando vuelvas a iniciar sesión.';
+
+  @override
+  String get qsReauthAction => 'Iniciar sesión de nuevo';
+
+  @override
+  String qsDeletedElsewhere(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count cuadernos se eliminaron en otro dispositivo. Tus copias se quedan solo aquí.',
+      one:
+          '$count cuaderno se eliminó en otro dispositivo. Tu copia se queda solo aquí.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qsDeletedElsewhereHint =>
+      'Mantén pulsado un cuaderno y elige \"Volver a sincronizar este cuaderno\" para subirlo de nuevo.';
+
+  @override
+  String get qsRefreshTooltip => 'Actualizar desde el servidor';
+
+  @override
+  String get qsResumeSyncPending =>
+      'Servidor no accesible. Este cuaderno se subirá en cuanto vuelva a estarlo.';
+
+  @override
+  String get qsResumeSyncUploaded =>
+      'Subido. Este cuaderno vuelve a sincronizarse.';
+
+  @override
+  String get qsNoServerConnected => 'No hay ningún servidor conectado.';
+
+  @override
+  String get qsLoginWrongCredentials =>
+      'El servidor rechazó el usuario o la contraseña.';
+
+  @override
+  String get qsLoginNotAServer =>
+      'No se encontró ningún servidor Nextcloud o WebDAV en esta dirección. Revisa la URL.';
+
+  @override
+  String get qsLoginUnreachable =>
+      'No se puede acceder al servidor. Revisa la dirección y tu conexión.';
+
+  @override
+  String get qsLoginThrottled =>
+      'Demasiados intentos. El servidor pide esperar un poco antes de reintentar.';
+
+  @override
+  String get qsLoginServerError =>
+      'El servidor devolvió un error. Inténtalo más tarde.';
+
+  @override
+  String get quPenNoMonitor => 'No se encontró ningún monitor activo.';
+
+  @override
+  String get quPenNoDevice => 'No se encontró ningún dispositivo de lápiz.';
+
+  @override
+  String get quPenBadGeometry => 'Geometría del escritorio no válida.';
+
+  @override
+  String quPenToolMissing(String tool) {
+    return '$tool no encontrado.';
+  }
+
+  @override
+  String quPenToolFailed(String tool) {
+    return '$tool falló.';
+  }
+
+  @override
+  String get quDiffStrokes => 'Trazos';
+
+  @override
+  String get quDiffImages => 'Imágenes';
+
+  @override
+  String get quDiffShapes => 'Formas';
+
+  @override
+  String get quDiffTexts => 'Textos';
+
+  @override
+  String get quDefaultChapter => 'Capítulo 1';
+
+  @override
+  String qtNeedsOpenToUpload(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cuadernos también cambiaron en otro dispositivo',
+      one: '$count cuaderno también cambió en otro dispositivo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qtNeedsOpenToUploadHint =>
+      'Ábrelo para combinar y subir tus cambios.';
+
+  @override
+  String get qtResumeSyncNeedsOpen =>
+      'Este cuaderno vuelve a sincronizarse. Ábrelo para combinar los cambios hechos en otro dispositivo.';
 }

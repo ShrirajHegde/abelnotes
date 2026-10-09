@@ -41,11 +41,16 @@ class BlockPaginator {
   final _uuid = const Uuid();
   int _zIndex = 0;
 
+  /// True when the last [paginate] call stopped at its `maxPages` cap.
+  bool truncated = false;
+
   Future<List<DraftPage>> paginate(
     List<ImportBlock> blocks, {
     void Function(int done, int total)? onProgress,
     bool Function()? isCancelled,
+    int? maxPages,
   }) async {
+    truncated = false;
     final pages = <DraftPage>[DraftPage()];
     var cursorY = topY;
 
@@ -63,6 +68,11 @@ class BlockPaginator {
 
     for (var i = 0; i < blocks.length; i++) {
       if (isCancelled?.call() ?? false) return pages;
+      if (maxPages != null && pages.length > maxPages) {
+        truncated = true;
+        pages.removeRange(maxPages, pages.length);
+        break;
+      }
       if (i % _yieldEvery == 0) {
         onProgress?.call(i, blocks.length);
         await Future<void>.delayed(Duration.zero);
@@ -153,6 +163,7 @@ class BlockPaginator {
               _placeTextBlock(head, page(), cursorY);
               breakPage();
               rest = tail;
+              if (maxPages != null && pages.length > maxPages) break;
             }
           }
           cursorY += _spacingAfter(block.kind);
@@ -234,6 +245,10 @@ class BlockPaginator {
           danglingHeading = null;
           cursorY += h + 12;
       }
+    }
+    if (maxPages != null && pages.length > maxPages) {
+      truncated = true;
+      pages.removeRange(maxPages, pages.length);
     }
     onProgress?.call(blocks.length, blocks.length);
 

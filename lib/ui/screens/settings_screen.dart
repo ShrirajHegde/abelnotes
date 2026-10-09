@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:abelnotes/config/app_config.dart';
@@ -22,6 +23,7 @@ import 'package:abelnotes/ui/screens/trash_screen.dart';
 import 'package:abelnotes/ui/theme/hw_icons.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
 import 'package:abelnotes/ui/primitives/hw_button.dart';
+import 'package:abelnotes/ui/primitives/scrollable_sheet.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -78,6 +80,7 @@ class _SettingsScreenV2State extends ConsumerState<SettingsScreenV2> {
                     );
             }
             return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _Rail(
                   section: _section,
@@ -550,7 +553,7 @@ class _GeneralSection extends ConsumerWidget {
       ('pt', l10n.setLanguagePortuguese),
       ('zh', l10n.setLanguageChinese),
     ];
-    final picked = await showModalBottomSheet<String>(
+    final picked = await showScrollableSheet<String>(
       context: context,
       backgroundColor: p.paper0,
       shape: const RoundedRectangleBorder(
@@ -902,24 +905,28 @@ class _ShortcutsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
     final l10n = AppLocalizations.of(context);
+    final apple = defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    final mod = apple ? '⌘' : 'Ctrl';
+    final shift = apple ? '⇧' : 'Shift';
     final shortcuts = [
       (l10n.setShortcutPen, 'P'),
-      (l10n.setShortcutUndo, '⌘ Z'),
+      (l10n.setShortcutUndo, '$mod Z'),
       (l10n.setShortcutBrush, 'B'),
-      (l10n.setShortcutRedo, '⌘ ⇧ Z'),
+      (l10n.setShortcutRedo, '$mod $shift Z'),
       (l10n.setShortcutEraser, 'E'),
-      (l10n.setShortcutSelectAll, '⌘ A'),
+      (l10n.setShortcutSelectAll, '$mod A'),
       (l10n.setShortcutLasso, 'L'),
-      (l10n.setShortcutCopy, '⌘ C'),
+      (l10n.setShortcutCopy, '$mod C'),
       (l10n.setShortcutHand, 'H'),
-      (l10n.setShortcutCut, '⌘ X'),
+      (l10n.setShortcutCut, '$mod X'),
       (l10n.setShortcutText, 'T'),
-      (l10n.setShortcutPaste, '⌘ V'),
+      (l10n.setShortcutPaste, '$mod V'),
       (l10n.setShortcutShape, 'S'),
-      (l10n.setShortcutDuplicate, '⌘ D'),
+      (l10n.setShortcutDuplicate, '$mod D'),
       (l10n.setShortcutChangePage, '↑ ↓'),
-      (l10n.setShortcutSave, '⌘ S'),
-      (l10n.setShortcutFit, '⌘ 0'),
+      (l10n.setShortcutSave, '$mod S'),
+      (l10n.setShortcutFit, '$mod 0'),
       (l10n.setShortcutCheatSheet, '?'),
     ];
     return Column(
@@ -1222,6 +1229,20 @@ class _AdvancedSection extends ConsumerWidget {
     final p = HwThemeScope.of(context);
     final l10n = AppLocalizations.of(context);
     final notebooksAsync = ref.watch(notebookListProvider);
+    final localOnly = ref.watch(remoteStoreProvider) == null;
+
+    if (localOnly) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(l10n.setSectionAdvanced),
+          Text(
+            l10n.qlAdvancedLocalOnly,
+            style: TextStyle(fontSize: 14, color: p.ink2, height: 1.5),
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -61,6 +61,16 @@ void main() {
       expect(c.selectedText(), 'foo bar');
     });
 
+    test('fragment padding spaces collapse to one separator', () {
+      final c = PdfTextSelectionController(PdfTextLayer(
+        sourceAssetPath: 'a.png',
+        runs: [_run('foo ', 0, 0), _run(' ', 40, 0), _run(' bar', 50, 0)],
+      ));
+      c.begin(const Offset(1, 6));
+      c.update(const Offset(88, 6));
+      expect(c.selectedText(), 'foo bar');
+    });
+
     test('clear removes the selection', () {
       final c = PdfTextSelectionController(layer());
       c.begin(const Offset(1, 6));

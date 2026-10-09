@@ -94,15 +94,17 @@ void main() {
     final issues = <ImportIssue>[];
     final parser = MarkdownParser(
       resolveImage: (src, alt) => src == 'ok.png'
-          ? const ImageBlock(assetKey: 'k_ok.png', pxW: 100, pxH: 50)
-          : null,
+          ? const ImageResolution.ok(
+              ImageBlock(assetKey: 'k_ok.png', pxW: 100, pxH: 50))
+          : const ImageResolution.fail(),
       onIssue: issues.add,
       sourceName: 'test.md',
     );
     final blocks = parser.parse('![c](ok.png)\n\n![alt2](missing.png)');
     expect(blocks.whereType<ImageBlock>().single.assetKey, 'k_ok.png');
     expect(blocks.whereType<TextBlock>().single.plain, '[alt2]');
-    expect(issues.single.message, contains('missing.png'));
+    expect(issues.single.code, ImportIssueCode.imageNotFound);
+    expect(issues.single.arg, 'missing.png');
   });
 
   test('adjacent same-style spans are merged', () {

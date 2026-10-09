@@ -3,6 +3,7 @@ import 'package:abelnotes/features/import/data/import_models.dart';
 import 'package:abelnotes/features/import/data/onenote_importer.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import 'package:abelnotes/ui/theme/hw_icons.dart';
+import 'package:abelnotes/ui/primitives/scrollable_sheet.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
 
 /// "Importa da…" chooser. Returns the picked source type, or null when
@@ -10,7 +11,7 @@ import 'package:abelnotes/ui/theme/hw_theme.dart';
 Future<ImportSourceType?> showImportSourceSheet(BuildContext context) {
   final p = HwThemeScope.of(context);
   final l10n = AppLocalizations.of(context);
-  return showModalBottomSheet<ImportSourceType>(
+  return showScrollableSheet<ImportSourceType>(
     context: context,
     backgroundColor: p.paper0,
     shape: const RoundedRectangleBorder(

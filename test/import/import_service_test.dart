@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:abelnotes/core/services/sync_service.dart';
+import 'package:abelnotes/features/import/data/import_limits.dart';
 import 'package:abelnotes/features/import/data/import_models.dart';
 import 'package:abelnotes/features/import/data/import_service.dart';
 import 'package:abelnotes/shared/models/ncnote_format.dart';
@@ -29,6 +30,30 @@ void main() {
           'k_orfano.png': Uint8List.fromList([9]), // must be dropped
         },
       );
+
+  test('assembleDraft: truncation warning names the source file', () async {
+    final blocks = [
+      for (var i = 0; i < ImportLimits.maxPagesPerNote * 40; i++)
+        TextBlock(
+            spans: [TextSpanData(text: 'riga $i')],
+            plain: 'riga $i',
+            kind: BlockKind.heading1),
+    ];
+    final a = await ImportService.assembleDraft(
+        ImportedNotebookDraft(
+          title: 'V',
+          tags: const [],
+          chapters: [
+            ImportedChapterDraft(
+                title: 'Huge', blocks: blocks, sourceName: 'Huge.md'),
+          ],
+          assets: const {},
+        ),
+        resolvedTitle: 'V');
+    final issue = a!.issues
+        .firstWhere((i) => i.code == ImportIssueCode.pagesTruncated);
+    expect(issue.source, 'Huge.md');
+  });
 
   test('assembleDraft: chapters/pages/assets coherent, orphan asset dropped',
       () async {

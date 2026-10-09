@@ -393,7 +393,7 @@ abstract class AppLocalizations {
   /// No description provided for @csNoNotebookOpen.
   ///
   /// In it, this message translates to:
-  /// **'Nessun notebook aperto'**
+  /// **'Nessun taccuino aperto'**
   String get csNoNotebookOpen;
 
   /// No description provided for @csMissingPageDataTitle.
@@ -1767,7 +1767,7 @@ abstract class AppLocalizations {
   /// No description provided for @setSectionInput.
   ///
   /// In it, this message translates to:
-  /// **'Stylus & input'**
+  /// **'Stylus e input'**
   String get setSectionInput;
 
   /// No description provided for @setSectionSync.
@@ -1881,7 +1881,7 @@ abstract class AppLocalizations {
   /// No description provided for @setPalmRejection.
   ///
   /// In it, this message translates to:
-  /// **'Palm rejection'**
+  /// **'Rifiuto del palmo'**
   String get setPalmRejection;
 
   /// No description provided for @setPalmRejectionSub.
@@ -1905,7 +1905,7 @@ abstract class AppLocalizations {
   /// No description provided for @setTiltCalligraphy.
   ///
   /// In it, this message translates to:
-  /// **'Tilt → calligrafia'**
+  /// **'Inclinazione → calligrafia'**
   String get setTiltCalligraphy;
 
   /// No description provided for @setTiltCalligraphySub.
@@ -2133,7 +2133,7 @@ abstract class AppLocalizations {
   /// No description provided for @setShortcutCheatSheet.
   ///
   /// In it, this message translates to:
-  /// **'Cheat sheet'**
+  /// **'Promemoria'**
   String get setShortcutCheatSheet;
 
   /// No description provided for @setKeyboardShortcutsTitle.
@@ -2267,12 +2267,6 @@ abstract class AppLocalizations {
   /// In it, this message translates to:
   /// **'Il cestino è vuoto.'**
   String get setTrashEmptyState;
-
-  /// No description provided for @setTrashDeletedAgo.
-  ///
-  /// In it, this message translates to:
-  /// **'Eliminato {time} fa'**
-  String setTrashDeletedAgo(String time);
 
   /// No description provided for @setTrashRestore.
   ///
@@ -2877,13 +2871,13 @@ abstract class AppLocalizations {
   /// No description provided for @logUsernameLabel.
   ///
   /// In it, this message translates to:
-  /// **'Username'**
+  /// **'Nome utente'**
   String get logUsernameLabel;
 
   /// No description provided for @logUsernameRequired.
   ///
   /// In it, this message translates to:
-  /// **'Username richiesto'**
+  /// **'Nome utente richiesto'**
   String get logUsernameRequired;
 
   /// No description provided for @logPasswordLabel.
@@ -3105,7 +3099,7 @@ abstract class AppLocalizations {
   /// No description provided for @chromeLabelBallpoint.
   ///
   /// In it, this message translates to:
-  /// **'Ballpoint'**
+  /// **'Penna a sfera'**
   String get chromeLabelBallpoint;
 
   /// No description provided for @chromeLabelBrush.
@@ -3351,13 +3345,13 @@ abstract class AppLocalizations {
   /// No description provided for @pmPagesCut.
   ///
   /// In it, this message translates to:
-  /// **'{count, plural, one{1 pagina tagliata — aprire il notebook di destinazione per incollare.} other{{count} pagine tagliate — aprire il notebook di destinazione per incollare.}}'**
+  /// **'{count, plural, one{1 pagina tagliata — aprire il taccuino di destinazione per incollare.} other{{count} pagine tagliate — aprire il taccuino di destinazione per incollare.}}'**
   String pmPagesCut(int count);
 
   /// No description provided for @pmPagesCutSkipped.
   ///
   /// In it, this message translates to:
-  /// **'{count} pagine tagliate ({skipped} non ancora caricate, saltate) — aprire il notebook di destinazione per incollare.'**
+  /// **'{count} pagine tagliate ({skipped} non ancora caricate, saltate) — aprire il taccuino di destinazione per incollare.'**
   String pmPagesCutSkipped(int count, int skipped);
 
   /// No description provided for @pmSelectedCount.
@@ -4409,6 +4403,492 @@ abstract class AppLocalizations {
   /// In it, this message translates to:
   /// **'中文'**
   String get setLanguageChinese;
+
+  /// No description provided for @qlTrashDeletedNow.
+  ///
+  /// In it, this message translates to:
+  /// **'Eliminato adesso'**
+  String get qlTrashDeletedNow;
+
+  /// No description provided for @qlTrashDeletedMinutes.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{Eliminato {count} minuto fa} other{Eliminato {count} minuti fa}}'**
+  String qlTrashDeletedMinutes(int count);
+
+  /// No description provided for @qlTrashDeletedHours.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{Eliminato {count} ora fa} other{Eliminato {count} ore fa}}'**
+  String qlTrashDeletedHours(int count);
+
+  /// No description provided for @qlTrashDeletedDays.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{Eliminato {count} giorno fa} other{Eliminato {count} giorni fa}}'**
+  String qlTrashDeletedDays(int count);
+
+  /// No description provided for @qlAdvancedLocalOnly.
+  ///
+  /// In it, this message translates to:
+  /// **'Questi strumenti di recupero servono solo quando è collegato un server o Google Drive.'**
+  String get qlAdvancedLocalOnly;
+
+  /// No description provided for @qlNameRequired.
+  ///
+  /// In it, this message translates to:
+  /// **'Inserisci un nome'**
+  String get qlNameRequired;
+
+  /// No description provided for @qlDuplicate.
+  ///
+  /// In it, this message translates to:
+  /// **'Duplica'**
+  String get qlDuplicate;
+
+  /// No description provided for @qlDuplicateTitle.
+  ///
+  /// In it, this message translates to:
+  /// **'{title} (copia)'**
+  String qlDuplicateTitle(String title);
+
+  /// No description provided for @qlDuplicated.
+  ///
+  /// In it, this message translates to:
+  /// **'Taccuino duplicato'**
+  String get qlDuplicated;
+
+  /// No description provided for @qlDuplicateNoLocalCopy.
+  ///
+  /// In it, this message translates to:
+  /// **'Questo taccuino non è su questo dispositivo. Aprilo una volta per scaricarlo, poi duplicalo.'**
+  String get qlDuplicateNoLocalCopy;
+
+  /// No description provided for @qlDeleteOrphanBody.
+  ///
+  /// In it, this message translates to:
+  /// **'Su questo dispositivo non resta nessuna copia di questo taccuino, quindi non si potrà ripristinare. Verrà rimosso dalla libreria.'**
+  String get qlDeleteOrphanBody;
+
+  /// No description provided for @qlDeletedNoTrash.
+  ///
+  /// In it, this message translates to:
+  /// **'Rimosso. Su questo dispositivo non c\'era nessuna copia, quindi nulla è finito nel cestino.'**
+  String get qlDeletedNoTrash;
+
+  /// No description provided for @qlOpenCorrupt.
+  ///
+  /// In it, this message translates to:
+  /// **'I dati di questo taccuino sono danneggiati e non si possono aprire.'**
+  String get qlOpenCorrupt;
+
+  /// No description provided for @qlSearchNoResults.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun taccuino corrisponde a “{query}”.'**
+  String qlSearchNoResults(String query);
+
+  /// No description provided for @qcMouseSelectHint.
+  ///
+  /// In it, this message translates to:
+  /// **'Il mouse seleziona mentre è attiva una penna: per disegnare col mouse attivalo.'**
+  String get qcMouseSelectHint;
+
+  /// No description provided for @qcMouseDrawEnable.
+  ///
+  /// In it, this message translates to:
+  /// **'Disegna col mouse'**
+  String get qcMouseDrawEnable;
+
+  /// No description provided for @qiIssueRemoteImage.
+  ///
+  /// In it, this message translates to:
+  /// **'Immagine remota non scaricata: {arg}'**
+  String qiIssueRemoteImage(String arg);
+
+  /// No description provided for @qiIssueImageNotFound.
+  ///
+  /// In it, this message translates to:
+  /// **'Immagine non trovata: {arg}'**
+  String qiIssueImageNotFound(String arg);
+
+  /// No description provided for @qiIssueImageUnreadable.
+  ///
+  /// In it, this message translates to:
+  /// **'Immagine illeggibile: {arg}'**
+  String qiIssueImageUnreadable(String arg);
+
+  /// No description provided for @qiIssueAttachmentUnsupported.
+  ///
+  /// In it, this message translates to:
+  /// **'Allegato non supportato (solo immagini): {arg}'**
+  String qiIssueAttachmentUnsupported(String arg);
+
+  /// No description provided for @qiIssueAttachmentTooLarge.
+  ///
+  /// In it, this message translates to:
+  /// **'Allegato troppo grande, saltato: {arg}'**
+  String qiIssueAttachmentTooLarge(String arg);
+
+  /// No description provided for @qiIssueEmbedUnsupported.
+  ///
+  /// In it, this message translates to:
+  /// **'Incorporamento non importato (solo immagini e note): {arg}'**
+  String qiIssueEmbedUnsupported(String arg);
+
+  /// No description provided for @qiIssueNoteEmbedNotFound.
+  ///
+  /// In it, this message translates to:
+  /// **'Nota incorporata non trovata: {arg}'**
+  String qiIssueNoteEmbedNotFound(String arg);
+
+  /// No description provided for @qiIssueNoteEmbedSkipped.
+  ///
+  /// In it, this message translates to:
+  /// **'Nota incorporata non espansa (circolare o troppo annidata): {arg}'**
+  String qiIssueNoteEmbedSkipped(String arg);
+
+  /// No description provided for @qiIssueFileUnreadable.
+  ///
+  /// In it, this message translates to:
+  /// **'File illeggibile'**
+  String get qiIssueFileUnreadable;
+
+  /// No description provided for @qiIssueFileTooLarge.
+  ///
+  /// In it, this message translates to:
+  /// **'File troppo grande ({count} MB), saltato'**
+  String qiIssueFileTooLarge(int count);
+
+  /// No description provided for @qiIssueEncodingFallback.
+  ///
+  /// In it, this message translates to:
+  /// **'Il testo non era UTF-8 valido: letto come Latin-1'**
+  String get qiIssueEncodingFallback;
+
+  /// No description provided for @qiIssueCsvUnreadable.
+  ///
+  /// In it, this message translates to:
+  /// **'Tabella illeggibile'**
+  String get qiIssueCsvUnreadable;
+
+  /// No description provided for @qiIssueZipEntryTooLarge.
+  ///
+  /// In it, this message translates to:
+  /// **'Elemento dell\'archivio troppo grande ({count} MB), saltato'**
+  String qiIssueZipEntryTooLarge(int count);
+
+  /// No description provided for @qiIssueZipTotalTooLarge.
+  ///
+  /// In it, this message translates to:
+  /// **'Il contenuto dell\'archivio supera {count} MB: i file restanti sono stati saltati'**
+  String qiIssueZipTotalTooLarge(int count);
+
+  /// No description provided for @qiIssueHiddenFolders.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{1 nota in una cartella nascosta è stata saltata} other{{count} note in cartelle nascoste sono state saltate}}'**
+  String qiIssueHiddenFolders(int count);
+
+  /// No description provided for @qiIssueTooManyChapters.
+  ///
+  /// In it, this message translates to:
+  /// **'{count} capitoli: valuta di importare le sottocartelle separatamente'**
+  String qiIssueTooManyChapters(int count);
+
+  /// No description provided for @qiIssuePagesTruncated.
+  ///
+  /// In it, this message translates to:
+  /// **'Nota troncata dopo {count} pagine'**
+  String qiIssuePagesTruncated(int count);
+
+  /// No description provided for @qiIssueOneNoteSkipped.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{1 elemento non supportato saltato} other{{count} elementi non supportati saltati}}'**
+  String qiIssueOneNoteSkipped(int count);
+
+  /// No description provided for @qiErrNoMarkdown.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun file Markdown (.md) nella cartella scelta'**
+  String get qiErrNoMarkdown;
+
+  /// No description provided for @qiErrNoNotionContent.
+  ///
+  /// In it, this message translates to:
+  /// **'Lo zip non contiene file .md o .csv: serve un export Notion «Markdown e CSV»'**
+  String get qiErrNoNotionContent;
+
+  /// No description provided for @qiErrNothingImportable.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun contenuto importabile'**
+  String get qiErrNothingImportable;
+
+  /// No description provided for @qiErrZipUnreadable.
+  ///
+  /// In it, this message translates to:
+  /// **'Il file zip è danneggiato o non è un archivio valido'**
+  String get qiErrZipUnreadable;
+
+  /// No description provided for @qiErrNoOneNotePages.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessuna pagina importabile in questo file'**
+  String get qiErrNoOneNotePages;
+
+  /// No description provided for @qiErrUnexpected.
+  ///
+  /// In it, this message translates to:
+  /// **'errore imprevisto'**
+  String get qiErrUnexpected;
+
+  /// No description provided for @qiOneNoteSection.
+  ///
+  /// In it, this message translates to:
+  /// **'Sezione {n}'**
+  String qiOneNoteSection(int n);
+
+  /// No description provided for @qiOneNotePage.
+  ///
+  /// In it, this message translates to:
+  /// **'Pagina'**
+  String get qiOneNotePage;
+
+  /// No description provided for @qiPdfNotPdf.
+  ///
+  /// In it, this message translates to:
+  /// **'Questo file non è un PDF valido'**
+  String get qiPdfNotPdf;
+
+  /// No description provided for @qiPdfCorrupt.
+  ///
+  /// In it, this message translates to:
+  /// **'Questo PDF è danneggiato o incompleto e non può essere letto'**
+  String get qiPdfCorrupt;
+
+  /// No description provided for @qiPdfEmpty.
+  ///
+  /// In it, this message translates to:
+  /// **'Questo PDF non contiene pagine'**
+  String get qiPdfEmpty;
+
+  /// No description provided for @qiPdfUnsupported.
+  ///
+  /// In it, this message translates to:
+  /// **'Questo PDF usa una protezione o una funzione non supportata'**
+  String get qiPdfUnsupported;
+
+  /// No description provided for @qiPdfPasswordCancelled.
+  ///
+  /// In it, this message translates to:
+  /// **'Importazione annullata: password non fornita'**
+  String get qiPdfPasswordCancelled;
+
+  /// No description provided for @qiPdfImportFailed.
+  ///
+  /// In it, this message translates to:
+  /// **'Impossibile importare il PDF'**
+  String get qiPdfImportFailed;
+
+  /// No description provided for @qiPdfPasswordTitle.
+  ///
+  /// In it, this message translates to:
+  /// **'PDF protetto da password'**
+  String get qiPdfPasswordTitle;
+
+  /// No description provided for @qiPdfPasswordBody.
+  ///
+  /// In it, this message translates to:
+  /// **'Inserisci la password per importare questo PDF.'**
+  String get qiPdfPasswordBody;
+
+  /// No description provided for @qiPdfPasswordHint.
+  ///
+  /// In it, this message translates to:
+  /// **'Password'**
+  String get qiPdfPasswordHint;
+
+  /// No description provided for @qiPdfPasswordWrong.
+  ///
+  /// In it, this message translates to:
+  /// **'Password errata, riprova'**
+  String get qiPdfPasswordWrong;
+
+  /// No description provided for @qiPdfPasswordOpen.
+  ///
+  /// In it, this message translates to:
+  /// **'Apri'**
+  String get qiPdfPasswordOpen;
+
+  /// No description provided for @qiPdfPageCount.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{Il PDF ha 1 pagina.} other{Il PDF ha {count} pagine.}}'**
+  String qiPdfPageCount(int count);
+
+  /// No description provided for @qiPdfStartOutOfRange.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{Il PDF ha 1 pagina. Inizio fuori range.} other{Il PDF ha {count} pagine. Inizio fuori range.}}'**
+  String qiPdfStartOutOfRange(int count);
+
+  /// No description provided for @qsReauthBanner.
+  ///
+  /// In it, this message translates to:
+  /// **'Il server non accetta più il tuo accesso. Le modifiche restano al sicuro su questo dispositivo e si sincronizzeranno dopo il nuovo accesso.'**
+  String get qsReauthBanner;
+
+  /// No description provided for @qsReauthAction.
+  ///
+  /// In it, this message translates to:
+  /// **'Accedi di nuovo'**
+  String get qsReauthAction;
+
+  /// No description provided for @qsDeletedElsewhere.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{{count} quaderno è stato eliminato su un altro dispositivo. La tua copia resta solo qui.} other{{count} quaderni sono stati eliminati su un altro dispositivo. Le tue copie restano solo qui.}}'**
+  String qsDeletedElsewhere(int count);
+
+  /// No description provided for @qsDeletedElsewhereHint.
+  ///
+  /// In it, this message translates to:
+  /// **'Tieni premuto un quaderno e scegli \"Torna a sincronizzare questo quaderno\" per caricarlo di nuovo.'**
+  String get qsDeletedElsewhereHint;
+
+  /// No description provided for @qsRefreshTooltip.
+  ///
+  /// In it, this message translates to:
+  /// **'Aggiorna dal server'**
+  String get qsRefreshTooltip;
+
+  /// No description provided for @qsResumeSyncPending.
+  ///
+  /// In it, this message translates to:
+  /// **'Server non raggiungibile. Questo quaderno verrà caricato appena torna disponibile.'**
+  String get qsResumeSyncPending;
+
+  /// No description provided for @qsResumeSyncUploaded.
+  ///
+  /// In it, this message translates to:
+  /// **'Caricato. Questo quaderno si sincronizza di nuovo.'**
+  String get qsResumeSyncUploaded;
+
+  /// No description provided for @qsNoServerConnected.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun server collegato.'**
+  String get qsNoServerConnected;
+
+  /// No description provided for @qsLoginWrongCredentials.
+  ///
+  /// In it, this message translates to:
+  /// **'Il server ha rifiutato nome utente o password.'**
+  String get qsLoginWrongCredentials;
+
+  /// No description provided for @qsLoginNotAServer.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun server Nextcloud o WebDAV trovato a questo indirizzo. Controlla l\'URL.'**
+  String get qsLoginNotAServer;
+
+  /// No description provided for @qsLoginUnreachable.
+  ///
+  /// In it, this message translates to:
+  /// **'Impossibile raggiungere il server. Controlla l\'indirizzo e la connessione.'**
+  String get qsLoginUnreachable;
+
+  /// No description provided for @qsLoginThrottled.
+  ///
+  /// In it, this message translates to:
+  /// **'Troppi tentativi. Il server chiede di attendere un po\' prima di riprovare.'**
+  String get qsLoginThrottled;
+
+  /// No description provided for @qsLoginServerError.
+  ///
+  /// In it, this message translates to:
+  /// **'Il server ha restituito un errore. Riprova più tardi.'**
+  String get qsLoginServerError;
+
+  /// No description provided for @quPenNoMonitor.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun monitor attivo rilevato.'**
+  String get quPenNoMonitor;
+
+  /// No description provided for @quPenNoDevice.
+  ///
+  /// In it, this message translates to:
+  /// **'Nessun dispositivo penna trovato.'**
+  String get quPenNoDevice;
+
+  /// No description provided for @quPenBadGeometry.
+  ///
+  /// In it, this message translates to:
+  /// **'Geometria del desktop non valida.'**
+  String get quPenBadGeometry;
+
+  /// No description provided for @quPenToolMissing.
+  ///
+  /// In it, this message translates to:
+  /// **'{tool} non trovato.'**
+  String quPenToolMissing(String tool);
+
+  /// No description provided for @quPenToolFailed.
+  ///
+  /// In it, this message translates to:
+  /// **'{tool} ha restituito un errore.'**
+  String quPenToolFailed(String tool);
+
+  /// No description provided for @quDiffStrokes.
+  ///
+  /// In it, this message translates to:
+  /// **'Tratti'**
+  String get quDiffStrokes;
+
+  /// No description provided for @quDiffImages.
+  ///
+  /// In it, this message translates to:
+  /// **'Immagini'**
+  String get quDiffImages;
+
+  /// No description provided for @quDiffShapes.
+  ///
+  /// In it, this message translates to:
+  /// **'Forme'**
+  String get quDiffShapes;
+
+  /// No description provided for @quDiffTexts.
+  ///
+  /// In it, this message translates to:
+  /// **'Testi'**
+  String get quDiffTexts;
+
+  /// No description provided for @quDefaultChapter.
+  ///
+  /// In it, this message translates to:
+  /// **'Capitolo 1'**
+  String get quDefaultChapter;
+
+  /// No description provided for @qtNeedsOpenToUpload.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{{count} quaderno è cambiato anche su un altro dispositivo} other{{count} quaderni sono cambiati anche su un altro dispositivo}}'**
+  String qtNeedsOpenToUpload(int count);
+
+  /// No description provided for @qtNeedsOpenToUploadHint.
+  ///
+  /// In it, this message translates to:
+  /// **'Aprilo per unire e caricare le tue modifiche.'**
+  String get qtNeedsOpenToUploadHint;
+
+  /// No description provided for @qtResumeSyncNeedsOpen.
+  ///
+  /// In it, this message translates to:
+  /// **'Il quaderno si sincronizza di nuovo. Aprilo per unire le modifiche fatte su un altro dispositivo.'**
+  String get qtResumeSyncNeedsOpen;
 }
 
 class _AppLocalizationsDelegate

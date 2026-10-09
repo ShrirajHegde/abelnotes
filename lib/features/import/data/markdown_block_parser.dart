@@ -8,9 +8,24 @@ import 'package:abelnotes/shared/models/ncnote_format.dart';
 ///
 /// Image resolution is delegated to the adapter via [ImageBlockResolver]:
 /// the adapter owns asset bytes, dimension probing and dedup, and returns a
-/// ready [ImageBlock] (or null when the target is missing — the parser then
-/// reports an issue and keeps the alt text).
-typedef ImageBlockResolver = ImageBlock? Function(String src, String? alt);
+/// ready [ImageBlock] or the reason it could not (the parser then reports
+/// exactly one issue and keeps the alt text).
+typedef ImageBlockResolver = ImageResolution Function(String src, String? alt);
+
+class ImageResolution {
+  final ImageBlock? block;
+  final ImportIssueCode issue;
+
+  /// Readable name for the issue; defaults to the raw `src`.
+  final String? arg;
+
+  const ImageResolution.ok(ImageBlock this.block)
+      : issue = ImportIssueCode.imageNotFound,
+        arg = null;
+  const ImageResolution.fail(
+      [this.issue = ImportIssueCode.imageNotFound, this.arg])
+      : block = null;
+}
 
 /// Scheme used by adapters to mark internal links (Obsidian wikilinks,
 /// Notion relative page links) that should render as a link-colored span
@@ -217,9 +232,24 @@ class MarkdownParser {
 
   // ── inline spans ──
 
+  /// Layout-only HTML tags that carry no content of their own.
+  static final _htmlTag = RegExp(
+      r'</?(?:div|span|aside|details|summary|p|b|i|u|em|strong|mark|sup|sub|kbd|center|font|section|article|figure|figcaption|br|hr)\b[^>]*>',
+      caseSensitive: false);
+
+  static String _stripHtml(String t) => t.replaceAllMapped(_htmlTag, (m) {
+        final tag = m.group(0)!.toLowerCase();
+        return tag.startsWith('<br') || tag.startsWith('<hr') ? '\n' : '';
+      });
+
+  /// `$x^2$` (Obsidian rules: no space inside the delimiters, no digit right
+  /// after the closing one, so prices like "$5 and $10" stay text).
+  static final _inlineMath =
+      RegExp(r'(?<![\\$\d])\$(?!\s)([^$\n]*?[^\s$\\])\$(?!\d)');
+
   void _emitText(
       String text, BlockKind kind, int indent, List<ImportBlock> out) {
-    final t = text.trim();
+    final t = _stripHtml(text).trim();
     if (t.isEmpty) return;
     out.add(TextBlock(
       spans: [TextSpanData(text: t)],
@@ -232,6 +262,16 @@ class MarkdownParser {
   void _emitInline(List<md.Node> nodes, BlockKind kind, int indent,
       List<ImportBlock> out,
       {String prefix = ''}) {
+    if (prefix.isEmpty &&
+        kind == BlockKind.paragraph &&
+        nodes.length == 1 &&
+        nodes.first is md.Text) {
+      final m = _inlineMath.firstMatch(nodes.first.textContent.trim());
+      if (m != null && m.group(0) == nodes.first.textContent.trim()) {
+        out.add(MathBlock(latex: m.group(1)!));
+        return;
+      }
+    }
     final spans = <TextSpanData>[];
     final images = <ImageBlock>[];
     if (prefix.isNotEmpty) spans.add(TextSpanData(text: prefix));
@@ -254,7 +294,7 @@ class MarkdownParser {
     for (final node in nodes) {
       if (node is md.Text) {
         // Markdown soft line breaks arrive as '\n' inside the text.
-        spans.add(style.span(node.textContent));
+        _textSpans(_stripHtml(node.textContent), style, spans);
       } else if (node is md.Element) {
         switch (node.tag) {
           case 'strong':
@@ -287,14 +327,16 @@ class MarkdownParser {
           case 'img':
             final src = node.attributes['src'] ?? '';
             final alt = node.attributes['alt'];
-            final block = resolveImage?.call(src, alt);
-            if (block != null) {
-              images.add(block);
+            final res = resolveImage?.call(src, alt) ??
+                const ImageResolution.fail();
+            if (res.block != null) {
+              images.add(res.block!);
             } else {
               if ((alt ?? '').isNotEmpty) spans.add(style.span('[$alt]'));
               onIssue?.call(ImportIssue(
                 source: sourceName,
-                message: 'immagine non trovata: $src',
+                code: res.issue,
+                arg: res.arg ?? src,
               ));
             }
           case 'br':
@@ -304,6 +346,17 @@ class MarkdownParser {
         }
       }
     }
+  }
+
+  /// Plain text with inline `$math$` shown as its italic LaTeX source.
+  void _textSpans(String text, _InlineStyle style, List<TextSpanData> spans) {
+    var last = 0;
+    for (final m in _inlineMath.allMatches(text)) {
+      if (m.start > last) spans.add(style.span(text.substring(last, m.start)));
+      spans.add(style.copyWith(italic: true).span(m.group(1)!));
+      last = m.end;
+    }
+    if (last < text.length) spans.add(style.span(text.substring(last)));
   }
 
   /// Merge adjacent spans with identical styling and drop empties, keeping

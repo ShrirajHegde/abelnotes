@@ -29,6 +29,16 @@ void main() {
     }
   });
 
+  test('maxPages truncates and flags it', () async {
+    final blocks = [for (var i = 0; i < 400; i++) para('paragrafo numero $i')];
+    final pag = BlockPaginator();
+    final pages = await pag.paginate(blocks, maxPages: 3);
+    expect(pages, hasLength(3));
+    expect(pag.truncated, isTrue);
+    await pag.paginate([para('x')], maxPages: 3);
+    expect(pag.truncated, isFalse);
+  });
+
   test('many paragraphs flow onto multiple pages, none past bottom margin',
       () async {
     final blocks = [for (var i = 0; i < 120; i++) para('paragrafo numero $i')];

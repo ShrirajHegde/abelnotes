@@ -1107,7 +1107,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get setLanguageSub => 'Sprache der Benutzeroberfläche';
 
   @override
-  String get setLanguageItalian => 'Italienisch';
+  String get setLanguageItalian => 'Italiano';
 
   @override
   String get setFavoritesFirst => 'Favoriten zuerst';
@@ -1345,11 +1345,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get setTrashEmptyState => 'Der Papierkorb ist leer.';
-
-  @override
-  String setTrashDeletedAgo(String time) {
-    return 'Gelöscht vor $time';
-  }
 
   @override
   String get setTrashRestore => 'Wiederherstellen';
@@ -2660,4 +2655,384 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get setLanguageChinese => '中文';
+
+  @override
+  String get qlTrashDeletedNow => 'Gerade eben gelöscht';
+
+  @override
+  String qlTrashDeletedMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Vor $count Minuten gelöscht',
+      one: 'Vor $count Minute gelöscht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qlTrashDeletedHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Vor $count Stunden gelöscht',
+      one: 'Vor $count Stunde gelöscht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qlTrashDeletedDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Vor $count Tagen gelöscht',
+      one: 'Vor $count Tag gelöscht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qlAdvancedLocalOnly =>
+      'Diese Wiederherstellungswerkzeuge gelten nur, wenn ein Server oder Google Drive verbunden ist.';
+
+  @override
+  String get qlNameRequired => 'Namen eingeben';
+
+  @override
+  String get qlDuplicate => 'Duplizieren';
+
+  @override
+  String qlDuplicateTitle(String title) {
+    return '$title (Kopie)';
+  }
+
+  @override
+  String get qlDuplicated => 'Notizbuch dupliziert';
+
+  @override
+  String get qlDuplicateNoLocalCopy =>
+      'Dieses Notizbuch befindet sich nicht auf diesem Gerät. Öffne es einmal, um es herunterzuladen, und dupliziere es dann.';
+
+  @override
+  String get qlDeleteOrphanBody =>
+      'Auf diesem Gerät ist keine Kopie dieses Notizbuchs mehr vorhanden, daher kann es nicht wiederhergestellt werden. Es wird aus der Bibliothek entfernt.';
+
+  @override
+  String get qlDeletedNoTrash =>
+      'Entfernt. Auf diesem Gerät gab es keine Kopie, daher landete nichts im Papierkorb.';
+
+  @override
+  String get qlOpenCorrupt =>
+      'Die Daten dieses Notizbuchs sind beschädigt und können nicht geöffnet werden.';
+
+  @override
+  String qlSearchNoResults(String query) {
+    return 'Kein Notizbuch passt zu „$query“.';
+  }
+
+  @override
+  String get qcMouseSelectHint =>
+      'Die Maus wählt aus, solange ein Stift aktiv ist. Aktiviere das Zeichnen mit der Maus, um damit zu zeichnen.';
+
+  @override
+  String get qcMouseDrawEnable => 'Mit Maus zeichnen';
+
+  @override
+  String qiIssueRemoteImage(String arg) {
+    return 'Entferntes Bild nicht heruntergeladen: $arg';
+  }
+
+  @override
+  String qiIssueImageNotFound(String arg) {
+    return 'Bild nicht gefunden: $arg';
+  }
+
+  @override
+  String qiIssueImageUnreadable(String arg) {
+    return 'Bild konnte nicht gelesen werden: $arg';
+  }
+
+  @override
+  String qiIssueAttachmentUnsupported(String arg) {
+    return 'Nicht unterstützter Anhang (nur Bilder): $arg';
+  }
+
+  @override
+  String qiIssueAttachmentTooLarge(String arg) {
+    return 'Anhang zu groß, übersprungen: $arg';
+  }
+
+  @override
+  String qiIssueEmbedUnsupported(String arg) {
+    return 'Eingebettete Datei nicht importiert (nur Bilder und Notizen): $arg';
+  }
+
+  @override
+  String qiIssueNoteEmbedNotFound(String arg) {
+    return 'Eingebettete Notiz nicht gefunden: $arg';
+  }
+
+  @override
+  String qiIssueNoteEmbedSkipped(String arg) {
+    return 'Eingebettete Notiz nicht aufgelöst (zirkulär oder zu tief verschachtelt): $arg';
+  }
+
+  @override
+  String get qiIssueFileUnreadable => 'Datei konnte nicht gelesen werden';
+
+  @override
+  String qiIssueFileTooLarge(int count) {
+    return 'Datei zu groß ($count MB), übersprungen';
+  }
+
+  @override
+  String get qiIssueEncodingFallback =>
+      'Text war kein gültiges UTF-8, als Latin-1 gelesen';
+
+  @override
+  String get qiIssueCsvUnreadable => 'Tabelle konnte nicht gelesen werden';
+
+  @override
+  String qiIssueZipEntryTooLarge(int count) {
+    return 'Archiveintrag zu groß ($count MB), übersprungen';
+  }
+
+  @override
+  String qiIssueZipTotalTooLarge(int count) {
+    return 'Der Archivinhalt überschreitet $count MB, die übrigen Dateien wurden übersprungen';
+  }
+
+  @override
+  String qiIssueHiddenFolders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen in versteckten Ordnern wurden übersprungen',
+      one: '1 Notiz in einem versteckten Ordner wurde übersprungen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qiIssueTooManyChapters(int count) {
+    return '$count Kapitel: Unterordner besser einzeln importieren';
+  }
+
+  @override
+  String qiIssuePagesTruncated(int count) {
+    return 'Notiz nach $count Seiten abgeschnitten';
+  }
+
+  @override
+  String qiIssueOneNoteSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count nicht unterstützte Elemente übersprungen',
+      one: '1 nicht unterstütztes Element übersprungen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qiErrNoMarkdown =>
+      'Keine Markdown-Dateien (.md) im gewählten Ordner';
+
+  @override
+  String get qiErrNoNotionContent =>
+      'Die ZIP-Datei enthält keine .md- oder .csv-Dateien: Verwende einen Notion-Export „Markdown & CSV“';
+
+  @override
+  String get qiErrNothingImportable => 'Nichts Importierbares gefunden';
+
+  @override
+  String get qiErrZipUnreadable =>
+      'Die ZIP-Datei ist beschädigt oder kein gültiges Archiv';
+
+  @override
+  String get qiErrNoOneNotePages =>
+      'Keine importierbaren Seiten in dieser Datei';
+
+  @override
+  String get qiErrUnexpected => 'unerwarteter Fehler';
+
+  @override
+  String qiOneNoteSection(int n) {
+    return 'Abschnitt $n';
+  }
+
+  @override
+  String get qiOneNotePage => 'Seite';
+
+  @override
+  String get qiPdfNotPdf => 'Diese Datei ist kein gültiges PDF';
+
+  @override
+  String get qiPdfCorrupt =>
+      'Dieses PDF ist beschädigt oder unvollständig und kann nicht gelesen werden';
+
+  @override
+  String get qiPdfEmpty => 'Dieses PDF enthält keine Seiten';
+
+  @override
+  String get qiPdfUnsupported =>
+      'Dieses PDF verwendet einen nicht unterstützten Schutz oder eine nicht unterstützte Funktion';
+
+  @override
+  String get qiPdfPasswordCancelled =>
+      'Import abgebrochen: kein Passwort eingegeben';
+
+  @override
+  String get qiPdfImportFailed => 'Das PDF konnte nicht importiert werden';
+
+  @override
+  String get qiPdfPasswordTitle => 'Passwortgeschütztes PDF';
+
+  @override
+  String get qiPdfPasswordBody =>
+      'Gib das Passwort ein, um dieses PDF zu importieren.';
+
+  @override
+  String get qiPdfPasswordHint => 'Passwort';
+
+  @override
+  String get qiPdfPasswordWrong => 'Falsches Passwort, bitte erneut versuchen';
+
+  @override
+  String get qiPdfPasswordOpen => 'Öffnen';
+
+  @override
+  String qiPdfPageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Das PDF hat $count Seiten.',
+      one: 'Das PDF hat 1 Seite.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qiPdfStartOutOfRange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Das PDF hat $count Seiten. Der Start liegt außerhalb des Bereichs.',
+      one: 'Das PDF hat 1 Seite. Der Start liegt außerhalb des Bereichs.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qsReauthBanner =>
+      'Der Server akzeptiert deine Anmeldung nicht mehr. Deine Änderungen sind auf diesem Gerät sicher und werden nach erneuter Anmeldung synchronisiert.';
+
+  @override
+  String get qsReauthAction => 'Erneut anmelden';
+
+  @override
+  String qsDeletedElsewhere(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Notizbücher wurden auf einem anderen Gerät gelöscht. Deine Kopien bleiben nur hier.',
+      one:
+          '$count Notizbuch wurde auf einem anderen Gerät gelöscht. Deine Kopie bleibt nur hier.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qsDeletedElsewhereHint =>
+      'Halte ein Notizbuch gedrückt und wähle \"Dieses Notizbuch wieder synchronisieren\", um es erneut hochzuladen.';
+
+  @override
+  String get qsRefreshTooltip => 'Vom Server aktualisieren';
+
+  @override
+  String get qsResumeSyncPending =>
+      'Server nicht erreichbar. Dieses Notizbuch wird hochgeladen, sobald er wieder erreichbar ist.';
+
+  @override
+  String get qsResumeSyncUploaded =>
+      'Hochgeladen. Dieses Notizbuch wird wieder synchronisiert.';
+
+  @override
+  String get qsNoServerConnected => 'Kein Server verbunden.';
+
+  @override
+  String get qsLoginWrongCredentials =>
+      'Der Server hat Benutzername oder Passwort abgelehnt.';
+
+  @override
+  String get qsLoginNotAServer =>
+      'Unter dieser Adresse wurde kein Nextcloud- oder WebDAV-Server gefunden. Prüfe die URL.';
+
+  @override
+  String get qsLoginUnreachable =>
+      'Der Server ist nicht erreichbar. Prüfe die Adresse und deine Verbindung.';
+
+  @override
+  String get qsLoginThrottled =>
+      'Zu viele Versuche. Der Server bittet dich, eine Weile zu warten.';
+
+  @override
+  String get qsLoginServerError =>
+      'Der Server hat einen Fehler gemeldet. Versuche es später erneut.';
+
+  @override
+  String get quPenNoMonitor => 'Kein aktiver Monitor gefunden.';
+
+  @override
+  String get quPenNoDevice => 'Kein Stiftgerät gefunden.';
+
+  @override
+  String get quPenBadGeometry => 'Ungültige Desktop-Geometrie.';
+
+  @override
+  String quPenToolMissing(String tool) {
+    return '$tool nicht gefunden.';
+  }
+
+  @override
+  String quPenToolFailed(String tool) {
+    return '$tool ist fehlgeschlagen.';
+  }
+
+  @override
+  String get quDiffStrokes => 'Striche';
+
+  @override
+  String get quDiffImages => 'Bilder';
+
+  @override
+  String get quDiffShapes => 'Formen';
+
+  @override
+  String get quDiffTexts => 'Texte';
+
+  @override
+  String get quDefaultChapter => 'Kapitel 1';
+
+  @override
+  String qtNeedsOpenToUpload(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizbücher wurden auch auf einem anderen Gerät geändert',
+      one: '$count Notizbuch wurde auch auf einem anderen Gerät geändert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get qtNeedsOpenToUploadHint =>
+      'Öffne es, um deine Änderungen zusammenzuführen und hochzuladen.';
+
+  @override
+  String get qtResumeSyncNeedsOpen =>
+      'Dieses Notizbuch wird wieder synchronisiert. Öffne es, um Änderungen von einem anderen Gerät zusammenzuführen.';
 }

@@ -94,6 +94,20 @@ class WebDavService implements RemoteStore {
   /// it from the start instead of re-trusting on first use every time.
   final void Function(String fingerprint)? onCertificatePinned;
 
+  /// Called with true when the server rejects the credentials (401) and with
+  /// false when a later probe is accepted again.
+  final void Function(bool rejected)? onAuthRejectedChanged;
+
+  /// The server answered 401: no request leaves until [_authRetryAfter] has
+  /// passed, so a changed password is not hammered into a 429 throttle.
+  bool authRejected = false;
+  DateTime? _authRetryAt;
+  static const Duration _authRetryAfter = Duration(minutes: 10);
+
+  /// 429: requests are refused locally until this instant.
+  DateTime? _throttledUntil;
+  int _throttleHits = 0;
+
   /// Set when the server presented a certificate that does NOT match
   /// [pinnedCertFingerprint] (as opposed to "no pin yet" — see
   /// [_badCertificateCallback]). Callers use this to show a distinct
@@ -142,6 +156,7 @@ class WebDavService implements RemoteStore {
     this.serverType = WebDavServerType.nextcloud,
     this.pinnedCertFingerprint,
     this.onCertificatePinned,
+    this.onAuthRejectedChanged,
   }) {
     // Warn if not using HTTPS (credentials travel in plaintext over HTTP)
     final uri = Uri.parse(serverUrl);
@@ -190,9 +205,51 @@ class WebDavService implements RemoteStore {
       ..connectionTimeout = _connectTimeout
       ..autoUncompress = true
       ..badCertificateCallback = _badCertificateCallback;
-    _client = http_io.IOClient(_innerHttpClient);
+    _client = _GuardedClient(http_io.IOClient(_innerHttpClient), this);
     _lastClientBuildAt = DateTime.now();
     _consecutiveFailures = 0;
+  }
+
+  /// Refuses a request locally while the server has rejected the credentials
+  /// or is throttling us. One probe per [_authRetryAfter] goes through.
+  void _checkGate() {
+    final now = DateTime.now();
+    if (authRejected) {
+      final at = _authRetryAt;
+      if (at == null || now.isBefore(at)) {
+        throw WebDavException('Credentials rejected by the server', 401);
+      }
+      _authRetryAt = now.add(_authRetryAfter);
+    }
+    final until = _throttledUntil;
+    if (until != null && now.isBefore(until)) {
+      throw WebDavException('Server is throttling requests', 429);
+    }
+  }
+
+  void _observeResponse(http.StreamedResponse r) {
+    final code = r.statusCode;
+    if (code == 401) {
+      _authRetryAt = DateTime.now().add(_authRetryAfter);
+      if (!authRejected) {
+        authRejected = true;
+        onAuthRejectedChanged?.call(true);
+      }
+    } else if (code == 429) {
+      final retryAfter = int.tryParse(r.headers['retry-after'] ?? '');
+      final secs = retryAfter ??
+          (30 * (1 << (_throttleHits).clamp(0, 5))).clamp(30, 600);
+      _throttleHits++;
+      _throttledUntil = DateTime.now().add(Duration(seconds: secs));
+    } else if (code < 500) {
+      _throttleHits = 0;
+      _throttledUntil = null;
+      if (authRejected) {
+        authRejected = false;
+        _authRetryAt = null;
+        onAuthRejectedChanged?.call(false);
+      }
+    }
   }
 
   /// Record a request outcome. On repeated failure, rebuild the underlying
@@ -207,6 +264,16 @@ class WebDavService implements RemoteStore {
   }
 
   void _recordFailure(String op, Object error) {
+    // A refusal from the server (or our own gate) says nothing about the
+    // health of the connection pool.
+    if (error is WebDavException &&
+        (error.statusCode == 401 || error.statusCode == 429)) {
+      return;
+    }
+    if (error is String &&
+        (error.contains('status 401') || error.contains('status 429'))) {
+      return;
+    }
     _consecutiveFailures++;
     // "Connection closed" / "Connection reset" / "broken pipe" are
     // almost always pool-stale: the kept-alive socket was dropped
@@ -362,7 +429,12 @@ class WebDavService implements RemoteStore {
 
   /// Testa la connessione al server Nextcloud.
   /// Ritorna true se autenticazione e accesso riusciti.
-  Future<bool> testConnection() async {
+  Future<bool> testConnection() async =>
+      await probeConnection() == ConnectionProbe.ok;
+
+  /// Like [testConnection] but says why it failed, so the login form can tell
+  /// a wrong password from a wrong address.
+  Future<ConnectionProbe> probeConnection() async {
     try {
       final response = await _client
           .send(http.Request('PROPFIND', Uri.parse(_fullUrl('/')))
@@ -374,9 +446,20 @@ class WebDavService implements RemoteStore {
           .timeout(const Duration(seconds: AppConfig.webdavTimeoutSeconds));
 
       _drainStream(response);
-      return response.statusCode == 207; // Multi-Status = successo
+      final code = response.statusCode;
+      if (code == 207) return ConnectionProbe.ok;
+      if (code == 401 || code == 403) return ConnectionProbe.unauthorized;
+      if (code == 404 || code == 405 || code == 301 || code == 302) {
+        return ConnectionProbe.notAServer;
+      }
+      if (code == 429) return ConnectionProbe.throttled;
+      return ConnectionProbe.serverError;
+    } on WebDavException catch (e) {
+      return e.statusCode == 429
+          ? ConnectionProbe.throttled
+          : ConnectionProbe.unauthorized;
     } catch (e) {
-      return false;
+      return ConnectionProbe.unreachable;
     }
   }
 
@@ -1319,6 +1402,34 @@ class _MultiStatusArgs {
 /// Top-level [compute] entry point for off-thread multistatus parsing.
 List<WebDavItem> _parseMultiStatusEntry(_MultiStatusArgs a) =>
     WebDavService.parseMultiStatus(a.xml, a.requestPath, a.davUrl);
+
+/// Outcome of [WebDavService.probeConnection].
+enum ConnectionProbe {
+  ok,
+  unauthorized,
+  notAServer,
+  throttled,
+  serverError,
+  unreachable,
+}
+
+/// Wraps the real client so every call goes through the 401/429 gate.
+class _GuardedClient extends http.BaseClient {
+  _GuardedClient(this._inner, this._owner);
+  final http.Client _inner;
+  final WebDavService _owner;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    _owner._checkGate();
+    final response = await _inner.send(request);
+    _owner._observeResponse(response);
+    return response;
+  }
+
+  @override
+  void close() => _inner.close();
+}
 
 /// Eccezione specifica per errori WebDAV.
 class WebDavException extends RemoteStoreException {

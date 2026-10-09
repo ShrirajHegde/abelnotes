@@ -48,7 +48,8 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.setTrashPurgeTitle(entry.title)),
+        title: Text(l10n.setTrashPurgeTitle(
+            entry.title.isEmpty ? l10n.nbUntitled : entry.title)),
         content: Text(l10n.setTrashPurgeBody),
         actions: [
           TextButton(
@@ -95,12 +96,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  String _formatDate(DateTime d) {
-    final now = DateTime.now();
-    final diff = now.difference(d);
-    if (diff.inDays >= 1) return '${diff.inDays}d';
-    if (diff.inHours >= 1) return '${diff.inHours}h';
-    return '${diff.inMinutes}m';
+  String _deletedAgo(AppLocalizations l10n, DateTime d) {
+    final diff = DateTime.now().difference(d);
+    if (diff.inDays >= 1) return l10n.qlTrashDeletedDays(diff.inDays);
+    if (diff.inHours >= 1) return l10n.qlTrashDeletedHours(diff.inHours);
+    if (diff.inMinutes >= 1) return l10n.qlTrashDeletedMinutes(diff.inMinutes);
+    return l10n.qlTrashDeletedNow;
   }
 
   @override
@@ -173,15 +174,14 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text(entry.title,
+                                        Text(entry.title.isEmpty ? l10n.nbUntitled : entry.title,
                                             style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w500,
                                                 color: p.ink0)),
                                         const SizedBox(height: 2),
                                         Text(
-                                            l10n.setTrashDeletedAgo(
-                                                _formatDate(entry.deletedAt)),
+                                            _deletedAgo(l10n, entry.deletedAt),
                                             style: TextStyle(
                                                 fontSize: 12, color: p.ink2)),
                                       ],

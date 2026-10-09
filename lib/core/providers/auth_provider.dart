@@ -168,6 +168,19 @@ class CredentialsNotifier extends StateNotifier<NextcloudCredentials?> {
   }
 }
 
+/// The client the server last rejected, null when none. A client is built per
+/// login, so signing in again (even with the same password) retires it.
+final syncAuthRejectedProvider = StateProvider<WebDavService?>((ref) => null);
+
+/// True while the current client is the one the server rejected: the
+/// password was changed server-side or the app password revoked.
+final needsReauthProvider = Provider<bool>((ref) {
+  final creds = ref.watch(credentialsProvider);
+  final service = ref.watch(webdavServiceProvider);
+  final rejected = ref.watch(syncAuthRejectedProvider);
+  return creds != null && service != null && identical(rejected, service);
+});
+
 /// Provider per il servizio WebDAV, dipende dalle credenziali.
 ///
 /// On logout/credentials change the underlying `http.Client` must be closed
@@ -176,7 +189,8 @@ class CredentialsNotifier extends StateNotifier<NextcloudCredentials?> {
 final webdavServiceProvider = Provider<WebDavService?>((ref) {
   final creds = ref.watch(credentialsProvider);
   if (creds == null) return null;
-  final service = WebDavService(
+  late final WebDavService service;
+  service = WebDavService(
     serverUrl: creds.serverUrl,
     username: creds.username,
     password: creds.password,
@@ -184,6 +198,18 @@ final webdavServiceProvider = Provider<WebDavService?>((ref) {
     pinnedCertFingerprint: creds.certFingerprint,
     onCertificatePinned: (fp) =>
         ref.read(credentialsProvider.notifier).pinCertificate(fp),
+    onAuthRejectedChanged: (rejected) {
+      Future.microtask(() {
+        try {
+          final n = ref.read(syncAuthRejectedProvider.notifier);
+          if (rejected) {
+            n.state = service;
+          } else if (identical(n.state, service)) {
+            n.state = null;
+          }
+        } catch (_) {} // provider already disposed
+      });
+    },
   );
   ref.onDispose(service.dispose);
   return service;

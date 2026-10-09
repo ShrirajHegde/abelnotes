@@ -65,6 +65,43 @@ Rect scaledShapeResizeBox(Rect base, Offset grip, Offset cursor,
   );
 }
 
+/// The three corners of a `triangle` exactly as the painter draws them, in
+/// page coordinates (explicit vertices, cardinal apex direction, or the
+/// apex-up triangle rotated about its bbox centre).
+List<Offset> triangleCorners(ShapeData sh) {
+  if (sh.vertices.length == 6) {
+    final v = sh.vertices;
+    return [Offset(v[0], v[1]), Offset(v[2], v[3]), Offset(v[4], v[5])];
+  }
+  final l = min(sh.x1, sh.x2), r = max(sh.x1, sh.x2);
+  final t = min(sh.y1, sh.y2), b = max(sh.y1, sh.y2);
+  final cx = (l + r) / 2, cy = (t + b) / 2;
+  final rem = sh.rotation % (pi / 2);
+  if (rem.abs() < 1e-3 || (rem - pi / 2).abs() < 1e-3) {
+    switch ((sh.rotation / (pi / 2)).round() % 4) {
+      case 1:
+      case -3:
+        return [Offset(r, cy), Offset(l, t), Offset(l, b)];
+      case 2:
+      case -2:
+        return [Offset(cx, b), Offset(r, t), Offset(l, t)];
+      case 3:
+      case -1:
+        return [Offset(l, cy), Offset(r, b), Offset(r, t)];
+      default:
+        return [Offset(cx, t), Offset(l, b), Offset(r, b)];
+    }
+  }
+  final c = Offset(cx, cy);
+  final ca = cos(sh.rotation), sa = sin(sh.rotation);
+  Offset rot(Offset p) {
+    final d = p - c;
+    return Offset(cx + d.dx * ca - d.dy * sa, cy + d.dx * sa + d.dy * ca);
+  }
+
+  return [rot(Offset(cx, t)), rot(Offset(l, b)), rot(Offset(r, b))];
+}
+
 /// True if [p] falls inside the body of [sh] (rotation-aware).
 ///
 /// Meaningful for shapes carrying a `fillColor`: their interior is visible
@@ -72,6 +109,7 @@ Rect scaledShapeResizeBox(Rect base, Offset grip, Offset cursor,
 /// element instead of probing the outline alone — a filled circle was
 /// otherwise un-erasable and un-selectable unless you grazed its edge.
 bool shapeBodyContains(ShapeData sh, Offset p) {
+  if (sh.shapeType == 'triangle') return _pointInConvex(p, triangleCorners(sh));
   var q = p;
   if (sh.rotation != 0) {
     final cx = (sh.x1 + sh.x2) / 2, cy = (sh.y1 + sh.y2) / 2;

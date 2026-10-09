@@ -109,6 +109,7 @@ class AppSettings {
   final Map<String, DateTime> lastOpenedAt;
   final LibrarySortMode sortMode;
   final bool favoritesFirst;
+  final bool libraryGridView;
   final ThemeMode themeMode;
   /// OneNote-style preset rail, independent per ink tool — keyed by
   /// CanvasTool.name (pen/ballpoint/brush/highlighter each get their own
@@ -165,6 +166,7 @@ class AppSettings {
     this.lastOpenedAt = const {},
     this.sortMode = LibrarySortMode.modifiedDesc,
     this.favoritesFirst = true,
+    this.libraryGridView = true,
     this.themeMode = ThemeMode.system,
     this.toolPresets = const {},
     this.toolDock = const ToolDockConfig(),
@@ -190,6 +192,7 @@ class AppSettings {
     Map<String, DateTime>? lastOpenedAt,
     LibrarySortMode? sortMode,
     bool? favoritesFirst,
+    bool? libraryGridView,
     ThemeMode? themeMode,
     Map<String, List<PenPreset?>>? toolPresets,
     ToolDockConfig? toolDock,
@@ -211,6 +214,7 @@ class AppSettings {
         lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
         sortMode: sortMode ?? this.sortMode,
         favoritesFirst: favoritesFirst ?? this.favoritesFirst,
+        libraryGridView: libraryGridView ?? this.libraryGridView,
         themeMode: themeMode ?? this.themeMode,
         toolPresets: toolPresets ?? this.toolPresets,
         toolDock: toolDock ?? this.toolDock,
@@ -288,6 +292,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
         lastOpenedAt: opened,
         sortMode: sort,
         favoritesFirst: favFirst,
+        libraryGridView: map['grid_view'] as bool? ?? true,
         themeMode: theme,
         toolPresets: toolPresets,
         toolDock: dock,
@@ -312,6 +317,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
             .map((k, v) => MapEntry(k, v.toIso8601String())),
         'sort': state.sortMode.name,
         'fav_first': state.favoritesFirst,
+        'grid_view': state.libraryGridView,
         'theme': state.themeMode.name,
         'tool_presets': state.toolPresets.map((toolName, list) => MapEntry(
             toolName, list.map((p) => p?.toJson()).toList(growable: false))),
@@ -380,6 +386,12 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
 
   void setSortMode(LibrarySortMode mode) {
     state = state.copyWith(sortMode: mode);
+    _persist();
+  }
+
+  void setLibraryGridView(bool v) {
+    if (state.libraryGridView == v) return;
+    state = state.copyWith(libraryGridView: v);
     _persist();
   }
 

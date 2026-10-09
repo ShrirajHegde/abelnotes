@@ -77,6 +77,8 @@ class OneNoteImporter {
     String filePath, {
     void Function(ImportProgress progress)? onProgress,
     bool Function()? isCancelled,
+    String Function(int n)? sectionLabel,
+    String? pageLabel,
   }) async {
     onProgress?.call(const ImportProgress(phase: ImportPhase.scanning));
 
@@ -91,6 +93,8 @@ class OneNoteImporter {
       title: p.basenameWithoutExtension(filePath),
       onProgress: onProgress,
       isCancelled: isCancelled,
+      sectionLabel: sectionLabel,
+      pageLabel: pageLabel,
     );
   }
 
@@ -101,6 +105,8 @@ class OneNoteImporter {
     required String title,
     void Function(ImportProgress progress)? onProgress,
     bool Function()? isCancelled,
+    String Function(int n)? sectionLabel,
+    String? pageLabel,
   }) async {
     final issues = <ImportIssue>[];
     final assets = <String, Uint8List>{};
@@ -130,7 +136,7 @@ class OneNoteImporter {
         ));
         pages.add(_buildPage(
           page,
-          source: '${sectionName ?? ''} / ${pageTitle ?? 'pagina'}',
+          source: '${sectionName ?? ''} / ${pageTitle ?? pageLabel ?? 'Page'}',
           issues: issues,
           assets: assets,
           assetKeyByHash: assetKeyByHash,
@@ -141,14 +147,15 @@ class OneNoteImporter {
         chapters.add(OneNoteChapter(
           title: sectionName?.isNotEmpty == true
               ? sectionName!
-              : 'Sezione ${chapters.length + 1}',
+              : (sectionLabel?.call(chapters.length + 1) ??
+                  'Section ${chapters.length + 1}'),
           pages: pages,
         ));
       }
     }
 
     if (chapters.isEmpty) {
-      throw const FormatException('nessuna pagina importabile nel file');
+      throw const ImportException(ImportErrorCode.noOneNotePages);
     }
 
     return OneNoteParsed(
@@ -172,8 +179,8 @@ class OneNoteImporter {
     if (skipped > 0) {
       issues.add(ImportIssue(
         source: source,
-        severity: ImportIssueSeverity.info,
-        message: '$skipped elementi non supportati saltati',
+        code: ImportIssueCode.oneNoteElementsSkipped,
+        count: skipped,
       ));
     }
 

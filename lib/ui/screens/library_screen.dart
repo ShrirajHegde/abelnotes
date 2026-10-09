@@ -23,16 +23,21 @@ import 'package:abelnotes/features/import/data/import_service.dart';
 import 'package:abelnotes/features/import/data/notion_importer.dart';
 import 'package:abelnotes/features/import/data/obsidian_importer.dart';
 import 'package:abelnotes/features/import/data/onenote_importer.dart';
+import 'package:abelnotes/features/import/presentation/import_messages.dart';
 import 'package:abelnotes/features/import/presentation/import_progress_dialog.dart';
 import 'package:abelnotes/features/import/presentation/import_report_dialog.dart';
 import 'package:abelnotes/features/import/presentation/import_source_sheet.dart';
+import 'package:abelnotes/features/sync/sync_notices.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import 'package:abelnotes/ui/screens/settings_screen.dart';
+import 'package:abelnotes/shared/utils/relative_time.dart';
+import 'package:abelnotes/shared/utils/text_fold.dart';
 import 'package:abelnotes/ui/services/file_export.dart';
 import 'package:abelnotes/ui/services/notebook_opener.dart';
 import 'package:abelnotes/ui/theme/hw_icons.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
 import 'package:abelnotes/ui/primitives/hw_button.dart';
+import 'package:abelnotes/ui/primitives/scrollable_sheet.dart';
 import 'package:abelnotes/ui/primitives/sync_badge.dart';
 import 'package:uuid/uuid.dart';
 
@@ -47,7 +52,6 @@ class LibraryScreenV2 extends ConsumerStatefulWidget {
 class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
   final _searchCtrl = TextEditingController();
   String _query = '';
-  bool _gridView = true;
   Timer? _bgSyncTimer;
   String? _selectedFolderId;
 
@@ -59,6 +63,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
   void initState() {
     super.initState();
     Future.microtask(() async {
+      ref.read(notebookListProvider.notifier).loadDeletedElsewhere();
       ref.read(notebookListProvider.notifier).refresh();
       // A cold start opened via file association already has its request
       // queued; ref.listen only reports later changes.
@@ -167,8 +172,9 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
             _TopBar(
               searchController: _searchCtrl,
               onSearchChanged: (v) => setState(() => _query = v),
-              gridView: _gridView,
-              onViewToggle: (v) => setState(() => _gridView = v),
+              gridView: settings.libraryGridView,
+              onViewToggle:
+                  ref.read(appSettingsProvider.notifier).setLibraryGridView,
               onSortTap: _showSortSheet,
               onSettingsTap: _openSettings,
               onImportTap: _importFlow,
@@ -235,15 +241,19 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
             // shared folder (a flatpak reinstall, a restored home directory)
             // the library looks fully populated while uploading nowhere.
             const _LocalOnlyNotice(),
+            const DeletedElsewhereNotice(),
             _StorageFullNotice(notifier: notebookNotifier),
             _ServerUnreachableNotice(notifier: notebookNotifier),
             _PendingUploadsNotice(entries: notebooks),
             Expanded(
-              child: asyncList.when(
+              child: RefreshIndicator(
+                onRefresh: () => notebookNotifier.syncNow(showProgress: false),
+                child: asyncList.when(
                 data: (_) => _Body(
                   entries: notebooks,
                   sketches: sketches,
-                  gridView: _gridView,
+                  gridView: settings.libraryGridView,
+                  searchQuery: _query.trim(),
                   favoriteIds: settings.favoriteNotebookIds,
                   onOpen: _openNotebook,
                   onCreate: _createNotebook,
@@ -258,6 +268,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
                             .libErrorGeneric(e.toString()),
                         style: TextStyle(color: p.ink2))),
               ),
+              ),
             ),
             _FooterBar(),
           ],
@@ -268,11 +279,11 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
 
   List<NotebookEntry> _filterAndSort(
       List<NotebookEntry> all, AppSettings s, String query, String? folderId) {
-    var list = query.isEmpty
+    final q = foldForSearch(query.trim());
+    var list = q.isEmpty
         ? List<NotebookEntry>.from(all)
         : all
-            .where((n) =>
-                n.metadata.title.toLowerCase().contains(query.toLowerCase()))
+            .where((n) => foldForSearch(n.metadata.title).contains(q))
             .toList();
     if (folderId != null) {
       list = list
@@ -287,9 +298,9 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
         case LibrarySortMode.modifiedAsc:
           return a.metadata.modifiedAt.compareTo(b.metadata.modifiedAt);
         case LibrarySortMode.titleAsc:
-          return a.metadata.title.compareTo(b.metadata.title);
+          return _compareTitles(a.metadata.title, b.metadata.title);
         case LibrarySortMode.titleDesc:
-          return b.metadata.title.compareTo(a.metadata.title);
+          return _compareTitles(b.metadata.title, a.metadata.title);
         case LibrarySortMode.createdDesc:
           return b.metadata.createdAt.compareTo(a.metadata.createdAt);
         case LibrarySortMode.createdAsc:
@@ -310,6 +321,11 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     return list;
   }
 
+  static int _compareTitles(String a, String b) {
+    final c = foldForSearch(a).compareTo(foldForSearch(b));
+    return c != 0 ? c : a.compareTo(b);
+  }
+
   Future<void> _openNotebook(NotebookEntry entry) async {
     ref.read(appSettingsProvider.notifier).markOpened(entry.metadata.id);
     try {
@@ -327,7 +343,8 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                AppLocalizations.of(context).libErrorOpen(e.toString()))),
+                AppLocalizations.of(context)
+                    .libErrorOpen(syncErrorText(AppLocalizations.of(context), e)))),
       );
     }
   }
@@ -377,6 +394,8 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
         path,
         onProgress: controller.update,
         isCancelled: () => controller.cancelled,
+        sectionLabel: l10n.qiOneNoteSection,
+        pageLabel: l10n.qiOneNotePage,
       );
       if (controller.cancelled) {
         if (!mounted) return;
@@ -426,16 +445,12 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     }
   }
 
-  /// Bridge failures read like `parse_section: <parser diagnosis>` — useful in
-  /// the log, meaningless on screen. The importer's own FormatExceptions are
-  /// already written for people, so those pass through unwrapped.
+  /// Bridge failures read like `parse_section: <diagnosis>`: log-only text,
+  /// so any bridge FormatException maps to the generic unreadable message.
   String _oneNoteErrorMessage(AppLocalizations l10n, Object error) {
-    if (error is! FormatException) return l10n.libErrorImport(error.toString());
-    final message = error.message;
-    if (message.startsWith('parse_') || message.startsWith('bridge OneNote')) {
-      return l10n.libImportOneNoteUnreadable;
-    }
-    return l10n.libErrorImport(message);
+    if (error is ImportException) return importErrorText(l10n, error);
+    if (error is FormatException) return l10n.libImportOneNoteUnreadable;
+    return importErrorText(l10n, error);
   }
 
   /// Foreign-format import (Obsidian / Notion): pick the source, parse it to
@@ -530,7 +545,8 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
       if (!mounted) return;
       // ignore: use_build_context_synchronously
       Navigator.of(ctx).pop();
-      _toast(l10n.libErrorImport(e.toString()));
+      debugPrint('[Import] foreign import failed: $e');
+      _toast(importErrorText(l10n, e));
     } finally {
       controller.dispose();
     }
@@ -756,6 +772,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
   }
 
   Future<void> _createNotebook() async {
+    final chapterTitle = AppLocalizations.of(context).quDefaultChapter;
     final res = await showDialog<_NewNotebookResult>(
       context: context,
       builder: (_) => const _NewNotebookDialog(),
@@ -771,7 +788,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
                 title: res.title,
                 paperType: res.paperType,
                 coverColor: argb,
-                chapterTitle: AppLocalizations.of(context).nbDefaultChapterTitle,
+                chapterTitle: chapterTitle,
               );
       if (mounted) _openNotebook(entry);
     } catch (e) {
@@ -779,7 +796,8 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                AppLocalizations.of(context).libErrorCreate(e.toString()))),
+                AppLocalizations.of(context)
+                    .libErrorCreate(syncErrorText(AppLocalizations.of(context), e)))),
       );
     }
   }
@@ -795,7 +813,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
                 infinite: true,
                 backgroundType: 'dotted',
                 coverColor: HwTheme.cover4.toARGB32(),
-                chapterTitle: AppLocalizations.of(context).nbDefaultChapterTitle,
+                chapterTitle: AppLocalizations.of(context).quDefaultChapter,
               );
       if (mounted) _openNotebook(entry);
     } catch (e) {
@@ -803,7 +821,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(AppLocalizations.of(context)
-                .libErrorCreateSketch(e.toString()))),
+                .libErrorCreateSketch(syncErrorText(AppLocalizations.of(context), e)))),
       );
     }
   }
@@ -828,10 +846,16 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     final files = ref.read(fileServiceProvider);
 
     if (entry.localOnly) {
-      await files.setNotebookLocalOnly(entry.metadata.id, false);
+      final notifier = ref.read(notebookListProvider.notifier);
+      final uploaded = await notifier.resumeSync(entry);
       ref.read(canvasProvider.notifier).forgetLocalOnly(entry.metadata.id);
-      await ref.read(notebookListProvider.notifier).refresh(showProgress: false);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.libSyncResumedDone)));
+      await notifier.refresh(showProgress: false);
+      messenger.showSnackBar(SnackBar(
+          content: Text(uploaded
+              ? l10n.qsResumeSyncUploaded
+              : notifier.needsOpenToUpload.value.contains(entry.metadata.id)
+                  ? l10n.qtResumeSyncNeedsOpen
+                  : l10n.qsResumeSyncPending)));
       return;
     }
 
@@ -954,7 +978,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     final settings = ref.read(appSettingsProvider);
     final isFav = settings.favoriteNotebookIds.contains(entry.metadata.id);
 
-    final action = await showModalBottomSheet<String>(
+    final action = await showScrollableSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
@@ -994,6 +1018,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
                       : l10n.libAddToFavorites,
                   'fav'),
               _menuItem(ctx, 'pen', l10n.libRename, 'rename'),
+              _menuItem(ctx, 'duplicate', l10n.qlDuplicate, 'duplicate'),
               _menuItem(ctx, 'palette', l10n.libChangeCover, 'cover'),
               _menuItem(ctx, 'folder', l10n.libMoveToFolder, 'move'),
               _menuItem(ctx, 'export', l10n.libExport, 'export'),
@@ -1044,6 +1069,23 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
                 .renameNotebook(entry, t);
           }
           break;
+        case 'duplicate':
+          final copy = await ref
+              .read(notebookListProvider.notifier)
+              .duplicateNotebook(
+                  entry, l10n.qlDuplicateTitle(entry.metadata.title));
+          if (copy != null) {
+            final folderId = ref
+                .read(appSettingsProvider)
+                .notebookFolderId[entry.metadata.id];
+            if (folderId != null) {
+              ref
+                  .read(appSettingsProvider.notifier)
+                  .setNotebookFolder(copy.metadata.id, folderId);
+            }
+          }
+          _toast(copy == null ? l10n.qlDuplicateNoLocalCopy : l10n.qlDuplicated);
+          break;
         case 'move':
           await _showMoveToFolderSheet(entry);
           break;
@@ -1064,11 +1106,20 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
           }
           break;
         case 'delete':
+          // No copy left on this device and nobody to ask for one: there is
+          // nothing to put in the trash, so the dialog must not promise it.
+          final orphan = ref.read(remoteStoreProvider) == null &&
+              !await ref
+                  .read(fileServiceProvider)
+                  .hasLocalCopy(entry.metadata.id);
+          if (!mounted) return;
           final confirm = await showDialog<bool>(
             context: context,
             builder: (_) => AlertDialog(
               title: Text(l10n.libDeleteNotebookTitle),
-              content: Text(l10n.libDeleteNotebookBody),
+              content: Text(orphan
+                  ? l10n.qlDeleteOrphanBody
+                  : l10n.libDeleteNotebookBody),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -1080,7 +1131,10 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
             ),
           );
           if (confirm == true) {
-            await ref.read(notebookListProvider.notifier).deleteNotebook(entry);
+            final trashId = await ref
+                .read(notebookListProvider.notifier)
+                .deleteNotebook(entry);
+            if (trashId == null) _toast(l10n.qlDeletedNoTrash);
           }
           break;
       }
@@ -1100,7 +1154,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     final currentFolderId =
         ref.read(appSettingsProvider).notebookFolderId[entry.metadata.id];
 
-    await showModalBottomSheet<void>(
+    await showScrollableSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
@@ -1208,27 +1262,15 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     );
   }
 
-  Future<String?> _newFolderDialog(BuildContext ctx, {String? initial}) async {
+  Future<String?> _newFolderDialog(BuildContext ctx, {String? initial}) {
     final l10n = AppLocalizations.of(ctx);
-    final ctrl = TextEditingController(text: initial ?? '');
     return showDialog<String>(
       context: ctx,
-      builder: (dCtx) => AlertDialog(
-        title: Text(initial == null ? l10n.libNewFolder : l10n.libRenameFolder),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: InputDecoration(hintText: l10n.libFolderNameHint),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dCtx, null),
-              child: Text(l10n.libCancel)),
-          FilledButton(
-              onPressed: () => Navigator.pop(dCtx, ctrl.text.trim()),
-              child: Text(
-                  initial == null ? l10n.libCreate : l10n.libSave)),
-        ],
+      builder: (_) => _NameDialog(
+        title: initial == null ? l10n.libNewFolder : l10n.libRenameFolder,
+        hint: l10n.libFolderNameHint,
+        initial: initial ?? '',
+        confirmLabel: initial == null ? l10n.libCreate : l10n.libSave,
       ),
     );
   }
@@ -1258,7 +1300,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
 
   /// Bottom sheet to pick one of the 8 preset cover colours.
   Future<Color?> _pickCoverColor({Color? initial}) async {
-    return showModalBottomSheet<Color>(
+    return showScrollableSheet<Color>(
       context: context,
       backgroundColor: HwThemeScope.of(context).paper0,
       shape: const RoundedRectangleBorder(
@@ -1306,26 +1348,14 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     );
   }
 
-  Future<String?> _renameDialog(String old) async {
+  Future<String?> _renameDialog(String old) {
     final l10n = AppLocalizations.of(context);
-    final ctrl = TextEditingController(text: old);
     return showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(l10n.libRenameNotebookTitle),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(l10n.libCancel)),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
-              child: Text(l10n.libSave)),
-        ],
+      builder: (_) => _NameDialog(
+        title: l10n.libRenameNotebookTitle,
+        initial: old,
+        confirmLabel: l10n.libSave,
       ),
     );
   }
@@ -1335,7 +1365,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     final current = ref.read(appSettingsProvider).sortMode;
     final p = HwThemeScope.of(context);
     try {
-      final picked = await showModalBottomSheet<LibrarySortMode>(
+      final picked = await showScrollableSheet<LibrarySortMode>(
         context: context,
         backgroundColor: p.paper0,
         shape: const RoundedRectangleBorder(
@@ -1432,17 +1462,17 @@ class _FolderChipRow extends StatelessWidget {
     final p = HwThemeScope.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: p.paper0,
-            shape: BoxShape.circle,
-            border: Border.all(color: p.paper3),
+      child: Material(
+        color: p.paper0,
+        shape: CircleBorder(side: BorderSide(color: p.paper3)),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(icon, size: 18, color: p.ink1),
           ),
-          child: Icon(icon, size: 18, color: p.ink1),
         ),
       ),
     );
@@ -1453,21 +1483,22 @@ class _FolderChipRow extends StatelessWidget {
     final p = HwThemeScope.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? p.accentSoft : p.paper0,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: selected ? p.accent : p.paper3),
+      child: Material(
+        color: selected ? p.accentSoft : p.paper0,
+        shape: StadiumBorder(
+            side: BorderSide(color: selected ? p.accent : p.paper3)),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const StadiumBorder(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: selected ? p.ink0 : p.ink1,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                )),
           ),
-          child: Text(label,
-              style: TextStyle(
-                fontSize: 13,
-                color: selected ? p.ink0 : p.ink1,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              )),
         ),
       ),
     );
@@ -1476,7 +1507,7 @@ class _FolderChipRow extends StatelessWidget {
   Future<void> _showFolderChipMenu(BuildContext context, NotebookFolder folder) async {
     final l10n = AppLocalizations.of(context);
     final p = HwThemeScope.of(context);
-    final action = await showModalBottomSheet<String>(
+    final action = await showScrollableSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
@@ -1560,6 +1591,7 @@ class _TopBar extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return LayoutBuilder(builder: (ctx, c) {
       final isCompact = c.maxWidth < 720;
+      final iconOnly = !isCompact && c.maxWidth < 1100;
       final hPad = isCompact ? 16.0 : 32.0;
       return Container(
         padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 14),
@@ -1593,10 +1625,10 @@ class _TopBar extends StatelessWidget {
                     letterSpacing: -0.4,
                     color: p.ink0,
                   )),
-              const Spacer(),
             ],
             const SizedBox(width: 8),
-            // Search field — full width on phone, fixed 240 on wide.
+            // Search field — full width on phone, up to 240 on wide (shrinks
+            // before anything else overflows).
             if (isCompact)
               Expanded(
                 child: HwTextField(
@@ -1608,12 +1640,20 @@ class _TopBar extends StatelessWidget {
                 ),
               )
             else
-              HwTextField(
-                controller: searchController,
-                hint: l10n.libSearchHintNotebooks,
-                leading: const HwIcon('search', size: 16),
-                onChanged: onSearchChanged,
-                width: 240,
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 240),
+                    child: HwTextField(
+                      controller: searchController,
+                      hint: l10n.libSearchHintNotebooks,
+                      leading: const HwIcon('search', size: 16),
+                      onChanged: onSearchChanged,
+                      width: double.infinity,
+                    ),
+                  ),
+                ),
               ),
             const SizedBox(width: 8),
             // Wide-only: view toggle, sort label, divider, big "Importa".
@@ -1638,20 +1678,32 @@ class _TopBar extends StatelessWidget {
                 ]),
               ),
               const SizedBox(width: 12),
-              HwButton(
-                leading: const HwIcon('sort', size: 16),
-                label: sortLabel,
-                onPressed: onSortTap,
-              ),
+              if (iconOnly)
+                HwButton.icon(
+                    icon: const HwIcon('sort', size: 16),
+                    tooltip: l10n.libSortWithLabel(sortLabel),
+                    onPressed: onSortTap)
+              else
+                HwButton(
+                  leading: const HwIcon('sort', size: 16),
+                  label: sortLabel,
+                  onPressed: onSortTap,
+                ),
               const SizedBox(width: 12),
               const HwDivider(),
               const SizedBox(width: 12),
-              HwButton(
-                leading: const HwIcon('export', size: 16),
-                label: l10n.libImport,
-                tooltip: l10n.libImportTooltip,
-                onPressed: onImportTap,
-              ),
+              if (iconOnly)
+                HwButton.icon(
+                    icon: const HwIcon('export', size: 16),
+                    tooltip: l10n.libImportTooltip,
+                    onPressed: onImportTap)
+              else
+                HwButton(
+                  leading: const HwIcon('export', size: 16),
+                  label: l10n.libImport,
+                  tooltip: l10n.libImportTooltip,
+                  onPressed: onImportTap,
+                ),
               const SizedBox(width: 4),
               HwButton.icon(
                   icon: const HwIcon('settings', size: 16),
@@ -1676,7 +1728,7 @@ class _TopBar extends StatelessWidget {
     final p = HwThemeScope.of(context);
     final l10n = AppLocalizations.of(context);
     try {
-      await showModalBottomSheet<void>(
+      await showScrollableSheet<void>(
         context: context,
         backgroundColor: p.paper0,
         shape: const RoundedRectangleBorder(
@@ -1767,6 +1819,7 @@ class _Body extends StatelessWidget {
   final List<NotebookEntry> entries;
   final List<NotebookEntry> sketches;
   final bool gridView;
+  final String searchQuery;
   final Set<String> favoriteIds;
   final ValueChanged<NotebookEntry> onOpen;
   final VoidCallback onCreate;
@@ -1778,6 +1831,7 @@ class _Body extends StatelessWidget {
     required this.entries,
     required this.sketches,
     required this.gridView,
+    required this.searchQuery,
     required this.favoriteIds,
     required this.onOpen,
     required this.onCreate,
@@ -1803,30 +1857,41 @@ class _Body extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 8, 32, 20),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                // Both yield on a narrow phone: the heading and its count
-                // together are wider than a 412dp row once the text scales.
+                // Both groups yield on a narrow phone: the heading and its
+                // count together are wider than a 412dp row once text scales.
                 Flexible(
-                  child: Text(AppLocalizations.of(context).libYourNotebooks,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: p.ink0,
-                      )),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Flexible(
+                        child: Text(
+                            AppLocalizations.of(context).libYourNotebooks,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: p.ink0,
+                            )),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                            AppLocalizations.of(context)
+                                .libItemsCount(entries.length),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, color: p.ink2)),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                      AppLocalizations.of(context).libItemsCount(entries.length),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: p.ink2)),
-                ),
-                const Spacer(),
                 // Flexible so a narrow phone shortens the button's label
                 // rather than pushing the whole header off the screen.
                 Flexible(
@@ -1841,6 +1906,15 @@ class _Body extends StatelessWidget {
             ),
           ),
         ),
+        if (searchQuery.isNotEmpty && entries.isEmpty && sketches.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              child: Text(
+                  AppLocalizations.of(context).qlSearchNoResults(searchQuery),
+                  style: TextStyle(fontSize: 14, color: p.ink2)),
+            ),
+          ),
         if (gridView)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1932,27 +2006,37 @@ class _SketchSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Flexible(
-                child: Text(AppLocalizations.of(context).libSketches,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: p.ink0,
-                    )),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Flexible(
+                      child: Text(AppLocalizations.of(context).libSketches,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink0,
+                          )),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                          AppLocalizations.of(context).libInfiniteSpace,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, color: p.ink2)),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: 12),
-              Flexible(
-                child: Text(AppLocalizations.of(context).libInfiniteSpace,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: p.ink2)),
-              ),
-              const Spacer(),
               // Flexible so a narrow phone shortens the button's label
               // rather than pushing the whole header off the screen.
               Flexible(
@@ -2047,7 +2131,7 @@ class _SketchTile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                          _relativeTime(AppLocalizations.of(context),
+                          relativeTime(AppLocalizations.of(context),
                               entry.metadata.modifiedAt),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2367,7 +2451,7 @@ class _CoverTile extends StatelessWidget {
                             style: TextStyle(fontSize: 12, color: p.ink3)),
                         Expanded(
                           child: Text(
-                            _relativeTime(AppLocalizations.of(context),
+                            relativeTime(AppLocalizations.of(context),
                                 entry.metadata.modifiedAt),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -2435,6 +2519,8 @@ class _ListRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(entry.metadata.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -2446,10 +2532,11 @@ class _ListRow extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               SizedBox(
                 width: 120,
                 child: Text(
-                    _relativeTime(AppLocalizations.of(context),
+                    relativeTime(AppLocalizations.of(context),
                         entry.metadata.modifiedAt),
                     style: TextStyle(fontSize: 12, color: p.ink2)),
               ),
@@ -2466,10 +2553,17 @@ class _ListRow extends StatelessWidget {
   }
 }
 
-class _FooterBar extends StatelessWidget {
+class _FooterBar extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = HwThemeScope.of(context);
+    final l10n = AppLocalizations.of(context);
+    final backend = ref.watch(appSettingsProvider.select((s) => s.syncBackend));
+    final (footerIcon, footerLabel) = ref.watch(remoteStoreProvider) == null
+        ? ('cloud-off', l10n.libLocalOnlyBadge)
+        : backend == SyncBackend.drive
+            ? ('cloud-check', l10n.setSyncDriveTitle)
+            : ('cloud-check', l10n.libFooterWebdav);
     return LayoutBuilder(builder: (ctx, c) {
       // Both captions at full size overflow a phone's width — more so at a
       // large system font scale — so they share the row and ellipsize.
@@ -2488,14 +2582,16 @@ class _FooterBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  HwIcon('cloud-check', size: 14, color: p.ink2),
+                  HwIcon(footerIcon, size: 14, color: p.ink2),
                   const SizedBox(width: 6),
                   Flexible(
-                    child: Text(AppLocalizations.of(context).libFooterWebdav,
+                    child: Text(footerLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 13, color: p.ink2)),
                   ),
+                  const SizedBox(width: 4),
+                  const SyncRefreshButton(),
                 ],
               ),
             ),
@@ -2673,10 +2769,17 @@ class _PendingUploadsNotice extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Kept-here and not-downloaded notebooks are never going up.
-    final pending = entries
+    final waiting = entries
         .where((e) => e.isLocal && !e.localOnly && !e.notOnDevice)
-        .length;
-    if (pending == 0) return const SizedBox.shrink();
+        .toList();
+    if (waiting.isEmpty) return const SizedBox.shrink();
+    final needsOpen = ref
+        .read(notebookListProvider.notifier)
+        .needsOpenToUpload
+        .value;
+    final blocked =
+        waiting.where((e) => needsOpen.contains(e.metadata.id)).length;
+    final pending = waiting.length - blocked;
 
     final backend = ref.watch(appSettingsProvider.select((s) => s.syncBackend));
     // Local-only has no destination to name and nothing is queued for one.
@@ -2701,14 +2804,22 @@ class _PendingUploadsNotice extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    backend == SyncBackend.drive
-                        ? l10n.libPendingUploadsDrive(pending)
-                        : l10n.libPendingUploadsServer(pending),
-                    style: TextStyle(fontSize: 13, color: p.ink1),
-                  ),
-                  Text(l10n.libPendingUploadsHint,
-                      style: TextStyle(fontSize: 11, color: p.ink3)),
+                  if (pending > 0) ...[
+                    Text(
+                      backend == SyncBackend.drive
+                          ? l10n.libPendingUploadsDrive(pending)
+                          : l10n.libPendingUploadsServer(pending),
+                      style: TextStyle(fontSize: 13, color: p.ink1),
+                    ),
+                    Text(l10n.libPendingUploadsHint,
+                        style: TextStyle(fontSize: 11, color: p.ink3)),
+                  ],
+                  if (blocked > 0) ...[
+                    Text(l10n.qtNeedsOpenToUpload(blocked),
+                        style: TextStyle(fontSize: 13, color: p.ink1)),
+                    Text(l10n.qtNeedsOpenToUploadHint,
+                        style: TextStyle(fontSize: 11, color: p.ink3)),
+                  ],
                 ],
               ),
             ),
@@ -2901,19 +3012,6 @@ BackgroundTexture _textureFor(String paperType) {
   }
 }
 
-String _relativeTime(AppLocalizations l10n, DateTime dt) {
-  final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return l10n.libTimeNow;
-  if (diff.inHours < 1) return l10n.libTimeMinutesAgo(diff.inMinutes);
-  if (diff.inHours < 24) return l10n.libTimeHoursAgo(diff.inHours);
-  if (diff.inDays < 7) return l10n.libTimeDaysAgo(diff.inDays);
-  if (diff.inDays < 30) return l10n.libTimeWeeksAgo((diff.inDays / 7).floor());
-  if (diff.inDays < 365) {
-    return l10n.libTimeMonthsAgo((diff.inDays / 30).floor());
-  }
-  return l10n.libTimeYearsAgo((diff.inDays / 365).floor());
-}
-
 // ─── New notebook dialog ──────────────────────────────────────────
 class _NewNotebookResult {
   final String title;
@@ -2932,11 +3030,21 @@ class _NewNotebookDialogState extends State<_NewNotebookDialog> {
   final _titleCtrl = TextEditingController();
   Color _color = HwTheme.cover1;
   String _paper = 'lined';
+  bool _showError = false;
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     super.dispose();
+  }
+
+  void _submit() {
+    final t = _titleCtrl.text.trim();
+    if (t.isEmpty) {
+      setState(() => _showError = true);
+      return;
+    }
+    Navigator.of(context).pop(_NewNotebookResult(t, _color, _paper));
   }
 
   @override
@@ -2955,8 +3063,13 @@ class _NewNotebookDialogState extends State<_NewNotebookDialog> {
             TextField(
               controller: _titleCtrl,
               autofocus: true,
+              onChanged: (_) {
+                if (_showError) setState(() => _showError = false);
+              },
+              onEditingComplete: _submit,
               decoration: InputDecoration(
                 labelText: l10n.libNotebookTitleLabel,
+                errorText: _showError ? l10n.qlNameRequired : null,
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -3014,11 +3127,7 @@ class _NewNotebookDialogState extends State<_NewNotebookDialog> {
           child: Text(l10n.libCancel),
         ),
         FilledButton(
-          onPressed: () {
-            final t = _titleCtrl.text.trim();
-            if (t.isEmpty) return;
-            Navigator.of(context).pop(_NewNotebookResult(t, _color, _paper));
-          },
+          onPressed: _submit,
           child: Text(l10n.libCreate),
         ),
       ],
@@ -3040,6 +3149,70 @@ class _NewNotebookDialogState extends State<_NewNotebookDialog> {
             style: TextStyle(
                 color: selected ? p.paper0 : p.ink0, fontSize: 13)),
       ),
+    );
+  }
+}
+
+/// Single-line name prompt with inline validation; Enter confirms.
+class _NameDialog extends StatefulWidget {
+  final String title;
+  final String? hint;
+  final String initial;
+  final String confirmLabel;
+  const _NameDialog({
+    required this.title,
+    this.hint,
+    required this.initial,
+    required this.confirmLabel,
+  });
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final _ctrl = TextEditingController(text: widget.initial);
+  bool _showError = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final t = _ctrl.text.trim();
+    if (t.isEmpty) {
+      setState(() => _showError = true);
+      return;
+    }
+    Navigator.of(context).pop(t);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _ctrl,
+        autofocus: true,
+        onChanged: (_) {
+          if (_showError) setState(() => _showError = false);
+        },
+        onEditingComplete: _submit,
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          errorText: _showError ? l10n.qlNameRequired : null,
+          border: const OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.libCancel)),
+        FilledButton(onPressed: _submit, child: Text(widget.confirmLabel)),
+      ],
     );
   }
 }
