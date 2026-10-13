@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:abelnotes/core/providers/canvas_state.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import 'package:abelnotes/ui/primitives/hw_button.dart';
+import 'package:abelnotes/ui/primitives/hw_glass.dart';
+import 'package:abelnotes/ui/primitives/hw_motion_widgets.dart';
 import 'package:abelnotes/ui/primitives/sync_badge.dart';
 import 'package:abelnotes/ui/theme/hw_icons.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
@@ -89,23 +91,25 @@ class HwEditorTopBar extends StatelessWidget {
             leftPad, 0, isCompact ? 6 : 12, 0),
         decoration: BoxDecoration(
           color: p.paper0,
-          border: Border(bottom: BorderSide(color: p.paper3)),
+          border: Border(bottom: BorderSide(color: p.glassLine)),
         ),
         child: Row(
           children: [
             // Back button — icon-only on compact to save space.
             if (isCompact)
               HwButton.icon(
-                icon: const HwIcon('chevron-left', size: 16),
+                icon: const HwIcon('chevron-left', size: 18),
                 tooltip: l10n.chromeBackToLibraryTooltip,
                 onPressed: onBack,
+                color: p.accent,
               )
             else
               HwButton(
-                leading: const HwIcon('chevron-left', size: 16),
+                leading: const HwIcon('chevron-left', size: 18),
                 label: l10n.chromeLibrary,
                 onPressed: onBack,
                 tooltip: l10n.chromeBackToLibraryTooltip,
+                color: p.accent,
               ),
             const SizedBox(width: 4),
             const HwDivider(),
@@ -130,11 +134,7 @@ class HwEditorTopBar extends StatelessWidget {
                 notebookTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: p.ink0,
-                ),
+                style: HwType.headline.copyWith(color: p.ink0),
               ),
             ),
             const SizedBox(width: 6),
@@ -405,7 +405,9 @@ class HwFloatingDock extends StatelessWidget {
     return LayoutBuilder(builder: (ctx, c) {
       final avail = isVert ? c.maxHeight : c.maxWidth;
       final m = metricsFor(avail, hasGrip: hasGrip);
-      final bar = Flex(
+      final indicatorAt = _indicatorOffset(m, hasGrip);
+      final p = HwThemeScope.of(context);
+      final flex = Flex(
         direction: isVert ? Axis.vertical : Axis.horizontal,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -433,14 +435,25 @@ class HwFloatingDock extends StatelessWidget {
           _shapeGuessBtn(context, m),
         ],
       );
-      return Container(
+      // The active-tool pill slides between buttons instead of cutting.
+      final bar = Stack(children: [
+        if (indicatorAt != null)
+          HwSpringOffset(
+            offset: isVert ? Offset(0, indicatorAt) : Offset(indicatorAt, 0),
+            child: Container(
+              width: m.btn,
+              height: m.btn,
+              decoration: BoxDecoration(
+                color: p.accentSoft,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        flex,
+      ]);
+      return HwGlass(
+        borderRadius: BorderRadius.circular(m.btn / 2 + m.pad + 1),
         padding: EdgeInsets.all(m.pad),
-        decoration: BoxDecoration(
-          color: HwThemeScope.of(context).paper0,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: HwThemeScope.of(context).paper3),
-          boxShadow: hwShadow2(HwThemeScope.of(context).brightness),
-        ),
         // Too narrow even at the smallest button size (small phone, or a
         // vertical dock in landscape): scroll the bar rather than let it
         // overflow into a render error.
@@ -453,6 +466,32 @@ class HwFloatingDock extends StatelessWidget {
             : bar,
       );
     });
+  }
+
+  /// Main-axis offset of the active tool's button inside the bar, mirroring
+  /// the child order in [build]. Null when no dock button is active.
+  double? _indicatorOffset(DockMetrics m, bool hasGrip) {
+    final gap = m.rulePad * 2 + 1;
+    var off = hasGrip ? m.btn + gap : 0.0;
+    final order = <List<CanvasTool>>[
+      [CanvasTool.pen],
+      [CanvasTool.highlighter],
+      [],
+      [CanvasTool.eraserStroke, CanvasTool.eraserStandard],
+      [CanvasTool.lasso],
+      [CanvasTool.text],
+      [CanvasTool.laser],
+      [CanvasTool.pan],
+    ];
+    for (final slot in order) {
+      if (slot.isEmpty) {
+        off += gap;
+        continue;
+      }
+      if (slot.contains(currentTool)) return off;
+      off += m.btn;
+    }
+    return null;
   }
 
   /// Grip the user drags to move + re-dock the toolbar. Shows the
@@ -483,7 +522,7 @@ class HwFloatingDock extends StatelessWidget {
                 child: Icon(
                   isVert ? Icons.drag_handle : Icons.drag_indicator,
                   size: m.icon,
-                  color: dragging ? p.accentDeep : p.ink1,
+                  color: dragging ? p.accentDeep : p.ink3,
                 ),
               ),
             ),
@@ -552,19 +591,16 @@ class HwFloatingDock extends StatelessWidget {
               onToolChanged(tool, d.kind);
             }
           },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
+          child: HwPressable(
+            pressedScale: 0.9,
+            child: SizedBox(
             width: m.btn,
             height: m.btn,
-            decoration: BoxDecoration(
-              color: active ? p.ink0 : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
             child: Stack(
               alignment: Alignment.center,
               children: [
                 HwIcon(icon,
-                    size: m.icon, color: active ? p.paper0 : p.ink1),
+                    size: m.icon, color: active ? p.accentDeep : p.ink1),
                 // Color stripe under active ink tool
                 if (active && isInkTool)
                   Positioned(
@@ -580,6 +616,7 @@ class HwFloatingDock extends StatelessWidget {
                   ),
               ],
             ),
+          ),
           ),
         ),
       ),
@@ -751,15 +788,13 @@ class HwToolPopup extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
     final l10n = AppLocalizations.of(context);
-    return Container(
+    // Heavier glass than the dock: never light glass stacked on light glass.
+    return SizedBox(
       width: math.min(300, MediaQuery.of(context).size.width - 32),
+      child: HwGlass(
+      strong: true,
+      borderRadius: BorderRadius.circular(HwTheme.rXl - 2),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: p.paper0,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: p.paper3),
-        boxShadow: hwShadow3(p.brightness),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -924,6 +959,7 @@ class HwToolPopup extends StatelessWidget {
             ),
           ],
         ],
+      ),
       ),
     );
   }
@@ -1256,7 +1292,7 @@ class _HwBottomPageStripState extends State<HwBottomPageStrip> {
       height: 84,
       decoration: BoxDecoration(
         color: p.paper0,
-        border: Border(top: BorderSide(color: p.paper3)),
+        border: Border(top: BorderSide(color: p.glassLine)),
       ),
       padding: EdgeInsets.symmetric(
           horizontal: isCompact ? 10 : 20, vertical: 10),

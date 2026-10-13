@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import '../theme/hw_theme.dart';
 import '../theme/hw_icons.dart';
+import 'hw_glass.dart';
 
 /// [localOnly] is a deliberate choice, not a failure: the user asked for
 /// this notebook to stay put. Distinct from [offline], which means the
@@ -40,8 +41,7 @@ class SyncBadge extends StatelessWidget {
   }
 }
 
-/// Notebook cover drawn as a tilted card with binding shadow.
-/// Matches the design's inset-shadow trick to fake a binding.
+/// Notebook cover: spine on the left, soft sheen, title on a bottom scrim.
 class NotebookCover extends StatelessWidget {
   final Color color;
   final String title;
@@ -66,19 +66,17 @@ class NotebookCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
     const radius = BorderRadius.only(
-      topLeft: Radius.circular(4),
-      bottomLeft: Radius.circular(4),
-      topRight: Radius.circular(10),
-      bottomRight: Radius.circular(10),
+      topLeft: Radius.circular(5),
+      bottomLeft: Radius.circular(5),
+      topRight: Radius.circular(12),
+      bottomRight: Radius.circular(12),
     );
     return SizedBox(
       width: width,
       height: height,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: radius,
+      child: GestureDetector(
+        onTap: onTap,
+        child: HwPressable(
           child: Stack(
             children: [
               Container(
@@ -88,7 +86,7 @@ class NotebookCover extends StatelessWidget {
                   boxShadow: hwShadow2(p.brightness),
                 ),
               ),
-              // Binding shadow (left inner edge)
+              // Spine, with a hairline of light where it meets the board.
               Positioned(
                 left: 0,
                 top: 0,
@@ -96,21 +94,40 @@ class NotebookCover extends StatelessWidget {
                 width: 12,
                 child: Container(
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [Color(0x4D000000), Color(0x00000000)],
+                    color: Color(0x24000000),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(5),
+                      bottomLeft: Radius.circular(5),
                     ),
                   ),
                 ),
               ),
-              // Binding line
               Positioned(
                 left: 12,
                 top: 0,
                 bottom: 0,
                 width: 1,
-                child: Container(color: const Color(0x26000000)),
+                child: Container(color: const Color(0x1FFFFFFF)),
+              ),
+              // Sheen: light from the top-left.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: radius,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        stops: [0, 0.45, 1],
+                        colors: [
+                          Color(0x2EFFFFFF),
+                          Color(0x00FFFFFF),
+                          Color(0x14000000),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
               // Texture overlay (subtle white pattern)
               Positioned(
@@ -164,7 +181,7 @@ class NotebookCover extends StatelessWidget {
                     color: Color(0xF2FFFFFF),
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: -0.15,
+                    letterSpacing: -0.2,
                     height: 1.2,
                     shadows: [
                       Shadow(color: Color(0x66000000), offset: Offset(0, 1), blurRadius: 4),

@@ -138,14 +138,11 @@ class _PhoneMenu extends StatelessWidget {
           child: Row(
             children: [
               IconButton(
-                icon: const HwIcon('chevron-left', size: 18),
+                icon: HwIcon('chevron-left', size: 20, color: p.accent),
                 onPressed: onClose,
               ),
               Text(l10n.setSettingsTitle,
-                  style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: p.ink0)),
+                  style: HwType.title.copyWith(color: p.ink0, fontSize: 18)),
             ],
           ),
         ),
@@ -187,22 +184,22 @@ class _PhoneMenuItem extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: selected ? p.paper2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: selected ? p.accentSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(HwTheme.rMd),
         ),
         child: Row(
           children: [
-            HwIcon(icon, size: 16, color: selected ? p.ink0 : p.ink1),
+            HwIcon(icon, size: 18, color: selected ? p.accent : p.ink2),
             const SizedBox(width: 14),
             Expanded(
               child: Text(label,
                   style: TextStyle(
                     fontSize: 15,
-                    color: selected ? p.ink0 : p.ink1,
+                    color: selected ? p.accentDeep : p.ink0,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   )),
             ),
-            HwIcon('chevron-left', size: 12, color: p.ink3),
+            HwIcon('chevron-right', size: 14, color: p.ink3),
           ],
         ),
       ),
@@ -257,30 +254,31 @@ class _Rail extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final items = _sectionItems(l10n);
     return Container(
-      width: 240,
+      width: 248,
       decoration: BoxDecoration(
-        color: p.paper0,
+        // Same heavier material as the library sidebar.
+        color: Color.alphaBlend(p.ink0.withValues(alpha: 0.035), p.paper1),
         border: Border(right: BorderSide(color: p.paper3)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HwButton(
-            leading: const HwIcon('chevron-left', size: 16),
-            label: l10n.setBackToLibrary,
-            onPressed: onClose,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: HwButton(
+              leading: const HwIcon('chevron-left', size: 18),
+              label: l10n.setBackToLibrary,
+              onPressed: onClose,
+              color: p.accent,
+            ),
           ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
               l10n.setSettingsTitle,
-              style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  fontWeight: FontWeight.w600,
-                  color: p.ink2),
+              style: HwType.title.copyWith(color: p.ink0, fontSize: 17),
             ),
           ),
           for (final item in items)
@@ -317,19 +315,19 @@ class _RailItem extends StatelessWidget {
         onTap: onTap,
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? p.paper2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            color: selected ? p.accentSoft : Colors.transparent,
+            borderRadius: BorderRadius.circular(HwTheme.rSm + 1),
           ),
           child: Row(
             children: [
-              HwIcon(icon, size: 14, color: selected ? p.ink0 : p.ink1),
+              HwIcon(icon, size: 17, color: selected ? p.accent : p.ink2),
               const SizedBox(width: 10),
               Text(label,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: selected ? p.ink0 : p.ink1,
+                    fontSize: 14,
+                    color: selected ? p.accentDeep : p.ink0,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   )),
             ],
@@ -348,13 +346,7 @@ class _SectionHeader extends StatelessWidget {
     final p = HwThemeScope.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
-      child: Text(title,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
-            color: p.ink0,
-          )),
+      child: Text(title, style: HwType.largeTitle.copyWith(color: p.ink0)),
     );
   }
 }

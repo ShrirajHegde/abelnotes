@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../theme/hw_theme.dart';
+import 'hw_glass.dart';
 
 enum HwButtonStyle { ghost, solid, primary }
 
 /// Compact button matching the design spec.
 /// - ghost: transparent, hovers paper2
 /// - solid: paper2 background
-/// - primary: ink0 background, paper0 text
+/// - primary: accent background, onAccent text
 class HwButton extends StatefulWidget {
   final Widget? leading;
   final Widget? trailing;
@@ -82,8 +83,8 @@ class _HwButtonState extends State<HwButton> {
         bg = _hover ? p.paper3 : p.paper2;
         break;
       case HwButtonStyle.primary:
-        fg = widget.color ?? p.paper0;
-        bg = _hover ? p.accentDeep : p.ink0;
+        fg = widget.color ?? p.onAccent;
+        bg = _hover ? Color.lerp(p.accent, p.ink0, 0.12)! : p.accent;
         break;
     }
 
@@ -108,6 +109,7 @@ class _HwButtonState extends State<HwButton> {
                 color: fg,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
+                letterSpacing: -0.05,
                 fontFamily: HwTheme.fontSans)),
       ));
     }
@@ -118,11 +120,11 @@ class _HwButtonState extends State<HwButton> {
     }
 
     final content = AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 90),
       padding: padding,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(HwTheme.rSm),
+        borderRadius: BorderRadius.circular(HwTheme.rSm + 1),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: children),
     );
@@ -136,13 +138,17 @@ class _HwButtonState extends State<HwButton> {
           _hover = false;
           _press = false;
         }),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _press = true),
-          onTapCancel: () => setState(() => _press = false),
-          onTapUp: (_) => setState(() => _press = false),
-          onTap: disabled ? null : widget.onPressed,
-          child: content,
+        // Listener, not onTapDown: the press shows on pointer-down with no
+        // gesture-arena delay.
+        child: Listener(
+          onPointerDown: (_) => setState(() => _press = true),
+          onPointerUp: (_) => setState(() => _press = false),
+          onPointerCancel: (_) => setState(() => _press = false),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: disabled ? null : widget.onPressed,
+            child: HwPressable(enabled: !disabled, child: content),
+          ),
         ),
       ),
     );
@@ -271,7 +277,7 @@ class HwTextField extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(HwTheme.rMd),
-            borderSide: BorderSide(color: p.paperEdge),
+            borderSide: BorderSide(color: p.accent, width: 1.5),
           ),
         ),
       ),
@@ -293,9 +299,10 @@ class HwSwitch extends StatelessWidget {
       child: GestureDetector(
         onTap: () => onChanged(!value),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: 36,
-          height: 22,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          width: 40,
+          height: 24,
           decoration: BoxDecoration(
             color: value ? p.accent : p.paper3,
             borderRadius: BorderRadius.circular(999),
@@ -303,19 +310,20 @@ class HwSwitch extends StatelessWidget {
           child: Stack(
             children: [
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 150),
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
                 top: 2,
-                left: value ? 16 : 2,
+                left: value ? 18 : 2,
                 child: Container(
-                  width: 18,
-                  height: 18,
+                  width: 20,
+                  height: 20,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                          color: Color(0x1A000000),
-                          blurRadius: 2,
+                          color: Color(0x2600202E),
+                          blurRadius: 3,
                           offset: Offset(0, 1)),
                     ],
                   ),

@@ -3,6 +3,7 @@ import 'dart:io' show SocketException;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:abelnotes/ui/primitives/hw_open_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:abelnotes/core/providers/canvas_provider.dart';
@@ -34,24 +35,35 @@ bool _openInFlight = false;
 /// Opens a notebook: loads it (local first, server fallback), populates
 /// canvasProvider, then pushes the editor screen. Mirrors the legacy
 /// flow so the new UI inherits all the corruption-recovery logic.
+/// With [origin] (the tapped cover, global coords) the editor grows out of
+/// it and closes back into it.
 Future<void> openNotebookAndNavigate(
   BuildContext context,
   WidgetRef ref,
-  NotebookEntry entry,
-) async {
+  NotebookEntry entry, {
+  Rect? origin,
+}) async {
   if (_openInFlight) return;
   _openInFlight = true;
   try {
-    await _openNotebookAndNavigate(context, ref, entry);
+    await _openNotebookAndNavigate(context, ref, entry, origin,
+        Color(entry.metadata.coverColor));
   } finally {
     _openInFlight = false;
   }
 }
 
+Route<void> _editorRoute(Rect? origin, Color color) => origin == null
+    ? MaterialPageRoute(builder: (_) => const CanvasScreen())
+    : HwOpenRoute(
+        builder: (_) => const CanvasScreen(), origin: origin, color: color);
+
 Future<void> _openNotebookAndNavigate(
   BuildContext context,
   WidgetRef ref,
   NotebookEntry entry,
+  Rect? origin,
+  Color originColor,
 ) async {
   final l10n = AppLocalizations.of(context);
   // A download from an unreachable server can take minutes: the user may
@@ -138,9 +150,7 @@ Future<void> _openNotebookAndNavigate(
 
           if (await abandoned() || !context.mounted) return;
           dismissLoader();
-          await Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const CanvasScreen(),
-          ));
+          await Navigator.of(context).push(_editorRoute(origin, originColor));
           return;
         }
         // Corrupted loose store (no pages but document expects them) — fall
@@ -182,9 +192,7 @@ Future<void> _openNotebookAndNavigate(
 
         if (await abandoned() || !context.mounted) return;
         dismissLoader();
-        await Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => const CanvasScreen(),
-        ));
+        await Navigator.of(context).push(_editorRoute(origin, originColor));
         return;
       }
     }
@@ -240,9 +248,7 @@ Future<void> _openNotebookAndNavigate(
 
     if (await abandoned() || !context.mounted) return;
     dismissLoader();
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => const CanvasScreen(),
-    ));
+    await Navigator.of(context).push(_editorRoute(origin, originColor));
   } catch (e) {
     if (!context.mounted || cancelled) return;
     dismissLoader();

@@ -30,6 +30,7 @@ import 'package:abelnotes/features/import/presentation/import_source_sheet.dart'
 import 'package:abelnotes/features/sync/sync_notices.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import 'package:abelnotes/ui/screens/settings_screen.dart';
+import 'package:abelnotes/ui/screens/trash_screen.dart';
 import 'package:abelnotes/shared/utils/relative_time.dart';
 import 'package:abelnotes/shared/utils/text_fold.dart';
 import 'package:abelnotes/ui/services/file_export.dart';
@@ -37,6 +38,8 @@ import 'package:abelnotes/ui/services/notebook_opener.dart';
 import 'package:abelnotes/ui/theme/hw_icons.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
 import 'package:abelnotes/ui/primitives/hw_button.dart';
+import 'package:abelnotes/ui/primitives/hw_glass.dart';
+import 'package:abelnotes/ui/primitives/hw_motion_widgets.dart';
 import 'package:abelnotes/ui/primitives/scrollable_sheet.dart';
 import 'package:abelnotes/ui/primitives/sync_badge.dart';
 import 'package:uuid/uuid.dart';
@@ -51,6 +54,7 @@ class LibraryScreenV2 extends ConsumerStatefulWidget {
 
 class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
   final _searchCtrl = TextEditingController();
+  final _scroll = ScrollController();
   String _query = '';
   Timer? _bgSyncTimer;
   String? _selectedFolderId;
@@ -133,6 +137,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
   void dispose() {
     _bgSyncTimer?.cancel();
     _searchCtrl.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -164,117 +169,169 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
         .toList();
 
     final notebookNotifier = ref.read(notebookListProvider.notifier);
+    final l10n = AppLocalizations.of(context);
+    final folderName = settings.folders
+            .where((f) => f.id == _selectedFolderId)
+            .map((f) => f.name)
+            .firstOrNull ??
+        l10n.libAllNotebooks;
     return Scaffold(
       backgroundColor: p.paper1,
       body: SafeArea(
-        child: Column(
-          children: [
-            _TopBar(
-              searchController: _searchCtrl,
-              onSearchChanged: (v) => setState(() => _query = v),
-              gridView: settings.libraryGridView,
-              onViewToggle:
-                  ref.read(appSettingsProvider.notifier).setLibraryGridView,
-              onSortTap: _showSortSheet,
-              onSettingsTap: _openSettings,
-              onImportTap: _importFlow,
-              sortLabel: settings.sortMode.labelOf(AppLocalizations.of(context)),
-            ),
-            _FolderChipRow(
-                folders: settings.folders,
-                selectedFolderId: _selectedFolderId,
-                onSelect: (id) => setState(() => _selectedFolderId = id),
-                onCreate: () async {
-                  final name = await _newFolderDialog(context);
-                  if (name != null && name.isNotEmpty) {
-                    ref.read(appSettingsProvider.notifier).createFolder(name);
-                  }
-                },
-                onRename: (folder) async {
-                  final name = await _newFolderDialog(context, initial: folder.name);
-                  if (name != null && name.isNotEmpty) {
-                    ref.read(appSettingsProvider.notifier).renameFolder(folder.id, name);
-                  }
-                },
-                onDelete: (folder) async {
-                  final l10n = AppLocalizations.of(context);
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (dCtx) => AlertDialog(
-                      title: Text(l10n.libDeleteFolderTitle(folder.name)),
-                      content: Text(l10n.libDeleteFolderBody),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(dCtx, false),
-                            child: Text(l10n.libCancel)),
-                        FilledButton(
-                            onPressed: () => Navigator.pop(dCtx, true),
-                            child: Text(l10n.libDelete)),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    if (_selectedFolderId == folder.id) {
-                      setState(() => _selectedFolderId = null);
-                    }
-                    ref.read(appSettingsProvider.notifier).deleteFolder(folder.id);
-                  }
-                },
+        child: LayoutBuilder(builder: (context, c) {
+          // Wide windows get a sidebar; phones keep the folder chip row.
+          final wide = c.maxWidth >= 900;
+          final headerSlivers = <Widget>[
+            SliverToBoxAdapter(
+              child: _LargeTitle(
+                title: folderName,
+                subtitle: l10n.libItemsCount(notebooks.length),
+                scroll: _scroll,
+                hPad: wide ? 32 : 16,
               ),
-            // Sync-in-progress banner — visible during any background
-            // refresh, including the cold-start fetch on a fresh device
-            // (where `entries` is empty and the body just shows the
-            // "Nuovo taccuino" tile). Without this, a new-device user
-            // saw the empty body and had no clue notebooks were
-            // streaming in. The earlier banner-fix landed on the legacy
-            // LibraryScreen (lib/features/library/library_screen.dart)
-            // which main.dart no longer renders — this is the
-            // production screen.
-            _SyncBanner(notifier: notebookNotifier),
-            // A notebook waiting to be uploaded shows a small cloud badge on
-            // its row, which answers the question only if you know to hover
-            // it. After switching remotes there can be a dozen of them at
-            // once, and "did my old notebooks make it across?" deserves a
-            // sentence, not an icon.
-            // Onboarding asks once whether to sync; picking "start without
-            // sync" left nothing on screen saying so. With notebooks in a
-            // shared folder (a flatpak reinstall, a restored home directory)
-            // the library looks fully populated while uploading nowhere.
-            const _LocalOnlyNotice(),
-            const DeletedElsewhereNotice(),
-            _StorageFullNotice(notifier: notebookNotifier),
-            _ServerUnreachableNotice(notifier: notebookNotifier),
-            _PendingUploadsNotice(entries: notebooks),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => notebookNotifier.syncNow(showProgress: false),
-                child: asyncList.when(
-                data: (_) => _Body(
-                  entries: notebooks,
-                  sketches: sketches,
-                  gridView: settings.libraryGridView,
-                  searchQuery: _query.trim(),
-                  favoriteIds: settings.favoriteNotebookIds,
-                  onOpen: _openNotebook,
-                  onCreate: _createNotebook,
-                  onCreateSketch: _createSketch,
-                  onLongPress: _showNotebookMenu,
-                  onToggleFavorite: _toggleFavorite,
+            ),
+            if (!wide)
+              SliverToBoxAdapter(
+                child: _FolderChipRow(
+                  folders: settings.folders,
+                  selectedFolderId: _selectedFolderId,
+                  onSelect: (id) => setState(() => _selectedFolderId = id),
+                  onCreate: _createFolder,
+                  onRename: _renameFolder,
+                  onDelete: _deleteFolder,
                 ),
-                loading: () => _LoadingState(notifier: notebookNotifier),
-                error: (e, _) => Center(
-                    child: Text(
-                        AppLocalizations.of(context)
-                            .libErrorGeneric(e.toString()),
-                        style: TextStyle(color: p.ink2))),
               ),
-              ),
+            // Sync and storage notices; each collapses to nothing when idle.
+            SliverToBoxAdapter(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                _SyncBanner(notifier: notebookNotifier),
+                const _LocalOnlyNotice(),
+                const DeletedElsewhereNotice(),
+                _StorageFullNotice(notifier: notebookNotifier),
+                _ServerUnreachableNotice(notifier: notebookNotifier),
+                _PendingUploadsNotice(entries: notebooks),
+              ]),
             ),
-            _FooterBar(),
-          ],
-        ),
+          ];
+          final body = asyncList.when(
+            data: (_) => _Body(
+              controller: _scroll,
+              headerSlivers: headerSlivers,
+              hPad: wide ? 32 : 16,
+              entries: notebooks,
+              sketches: sketches,
+              gridView: settings.libraryGridView,
+              searchQuery: _query.trim(),
+              favoriteIds: settings.favoriteNotebookIds,
+              onOpen: _openNotebook,
+              onCreate: _createNotebook,
+              onCreateSketch: _createSketch,
+              onLongPress: _showNotebookMenu,
+              onToggleFavorite: _toggleFavorite,
+            ),
+            loading: () => Padding(
+              padding: const EdgeInsets.only(top: _TopBar.height),
+              child: _LoadingState(notifier: notebookNotifier),
+            ),
+            error: (e, _) => Center(
+                child: Text(l10n.libErrorGeneric(e.toString()),
+                    style: TextStyle(color: p.ink2))),
+          );
+          final main = Column(children: [
+            Expanded(
+              child: Stack(children: [
+                Positioned.fill(
+                  child: RefreshIndicator(
+                    edgeOffset: _TopBar.height,
+                    onRefresh: () =>
+                        notebookNotifier.syncNow(showProgress: false),
+                    child: body,
+                  ),
+                ),
+                // Floats over the list so content scrolls under its glass.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _TopBar(
+                    scroll: _scroll,
+                    title: folderName,
+                    wide: wide,
+                    searchController: _searchCtrl,
+                    onSearchChanged: (v) => setState(() => _query = v),
+                    gridView: settings.libraryGridView,
+                    onViewToggle: ref
+                        .read(appSettingsProvider.notifier)
+                        .setLibraryGridView,
+                    onSortTap: _showSortSheet,
+                    onSettingsTap: _openSettings,
+                    onImportTap: _importFlow,
+                    sortLabel: settings.sortMode.labelOf(l10n),
+                  ),
+                ),
+              ]),
+            ),
+            if (!wide) _FooterBar(),
+          ]);
+          if (!wide) return main;
+          return Row(children: [
+            _Sidebar(
+              folders: settings.folders,
+              entries: entries,
+              folderOf: settings.notebookFolderId,
+              selectedFolderId: _selectedFolderId,
+              onSelect: (id) => setState(() => _selectedFolderId = id),
+              onCreateFolder: _createFolder,
+              onRenameFolder: _renameFolder,
+              onDeleteFolder: _deleteFolder,
+              onTrash: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TrashScreen())),
+              onSettings: _openSettings,
+            ),
+            Expanded(child: main),
+          ]);
+        }),
       ),
     );
+  }
+
+  Future<void> _createFolder() async {
+    final name = await _newFolderDialog(context);
+    if (name != null && name.isNotEmpty) {
+      ref.read(appSettingsProvider.notifier).createFolder(name);
+    }
+  }
+
+  Future<void> _renameFolder(NotebookFolder folder) async {
+    final name = await _newFolderDialog(context, initial: folder.name);
+    if (name != null && name.isNotEmpty) {
+      ref.read(appSettingsProvider.notifier).renameFolder(folder.id, name);
+    }
+  }
+
+  Future<void> _deleteFolder(NotebookFolder folder) async {
+    final l10n = AppLocalizations.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.libDeleteFolderTitle(folder.name)),
+        content: Text(l10n.libDeleteFolderBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: Text(l10n.libCancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: Text(l10n.libDelete)),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      if (_selectedFolderId == folder.id) {
+        setState(() => _selectedFolderId = null);
+      }
+      ref.read(appSettingsProvider.notifier).deleteFolder(folder.id);
+    }
   }
 
   List<NotebookEntry> _filterAndSort(
@@ -326,10 +383,10 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     return c != 0 ? c : a.compareTo(b);
   }
 
-  Future<void> _openNotebook(NotebookEntry entry) async {
+  Future<void> _openNotebook(NotebookEntry entry, {Rect? origin}) async {
     ref.read(appSettingsProvider.notifier).markOpened(entry.metadata.id);
     try {
-      await openNotebookAndNavigate(context, ref, entry);
+      await openNotebookAndNavigate(context, ref, entry, origin: origin);
       if (!mounted) return;
       // The 5-minute tick skips while a notebook is open, so a session spent
       // in the editor would otherwise never retry pending uploads.
@@ -1414,6 +1471,61 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
 /// Horizontal scroller: "Tutti" + one chip per user folder. Long-press a
 /// folder chip for rename/delete — "Tutti" has no such affordance since it
 /// isn't a real folder.
+/// Rename/delete actions for a folder (long-press or right click).
+Future<void> _showFolderMenu(
+  BuildContext context,
+  NotebookFolder folder, {
+  required ValueChanged<NotebookFolder> onRename,
+  required ValueChanged<NotebookFolder> onDelete,
+}) async {
+  final l10n = AppLocalizations.of(context);
+  final p = HwThemeScope.of(context);
+  Widget row(String icon, String label, Color color, String value, BuildContext ctx) =>
+      InkWell(
+        onTap: () => Navigator.of(ctx).pop(value),
+        borderRadius: BorderRadius.circular(HwTheme.rMd),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Row(children: [
+            HwIcon(icon, size: 18, color: color),
+            const SizedBox(width: 12),
+            Text(label, style: HwType.callout.copyWith(color: color, fontSize: 15)),
+          ]),
+        ),
+      );
+  final action = await showScrollableSheet<String>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Container(
+      decoration: BoxDecoration(
+        color: p.paper0,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(HwTheme.rXl)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 5,
+              decoration: BoxDecoration(
+                  color: p.paper3, borderRadius: BorderRadius.circular(3)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          row('pen', l10n.libRenameFolder, p.ink0, 'rename', ctx),
+          row('trash', l10n.libDeleteFolder, HwTheme.syncConflict, 'delete', ctx),
+        ],
+      ),
+    ),
+  );
+  if (action == 'rename') onRename(folder);
+  if (action == 'delete') onDelete(folder);
+}
+
 class _FolderChipRow extends StatelessWidget {
   final List<NotebookFolder> folders;
   final String? selectedFolderId;
@@ -1435,43 +1547,44 @@ class _FolderChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return SizedBox(
-      height: 44,
+      height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
         children: [
-          _chip(context, label: l10n.libAllNotebooks, selected: selectedFolderId == null,
+          _chip(context,
+              label: l10n.libAllNotebooks,
+              selected: selectedFolderId == null,
               onTap: () => onSelect(null)),
           for (final folder in folders)
             GestureDetector(
-              onLongPress: () => _showFolderChipMenu(context, folder),
-              onSecondaryTap: () => _showFolderChipMenu(context, folder),
+              onLongPress: () => _showFolderMenu(context, folder,
+                  onRename: onRename, onDelete: onDelete),
+              onSecondaryTap: () => _showFolderMenu(context, folder,
+                  onRename: onRename, onDelete: onDelete),
               child: _chip(context,
                   label: folder.name,
                   selected: selectedFolderId == folder.id,
                   onTap: () => onSelect(folder.id)),
             ),
-          _iconChip(context, icon: Icons.add_rounded, onTap: onCreate),
+          _addChip(context),
         ],
       ),
     );
   }
 
-  Widget _iconChip(BuildContext context,
-      {required IconData icon, required VoidCallback onTap}) {
+  Widget _addChip(BuildContext context) {
     final p = HwThemeScope.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: p.paper0,
-        shape: CircleBorder(side: BorderSide(color: p.paper3)),
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: SizedBox(
+    return Tooltip(
+      message: AppLocalizations.of(context).libNewFolder,
+      child: GestureDetector(
+        onTap: onCreate,
+        child: HwPressable(
+          child: Container(
             width: 36,
             height: 36,
-            child: Icon(icon, size: 18, color: p.ink1),
+            decoration: BoxDecoration(color: p.paper2, shape: BoxShape.circle),
+            child: Center(child: HwIcon('plus', size: 16, color: p.ink1)),
           ),
         ),
       ),
@@ -1479,23 +1592,27 @@ class _FolderChipRow extends StatelessWidget {
   }
 
   Widget _chip(BuildContext context,
-      {required String label, required bool selected, required VoidCallback onTap}) {
+      {required String label,
+      required bool selected,
+      required VoidCallback onTap}) {
     final p = HwThemeScope.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: selected ? p.accentSoft : p.paper0,
-        shape: StadiumBorder(
-            side: BorderSide(color: selected ? p.accent : p.paper3)),
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const StadiumBorder(),
-          child: Padding(
+      child: GestureDetector(
+        onTap: onTap,
+        child: HwPressable(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? p.accentSoft : p.paper2,
+              borderRadius: BorderRadius.circular(999),
+            ),
             child: Text(label,
                 style: TextStyle(
-                  fontSize: 13,
-                  color: selected ? p.ink0 : p.ink1,
+                  fontSize: 13.5,
+                  color: selected ? p.accentDeep : p.ink1,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 )),
           ),
@@ -1503,68 +1620,270 @@ class _FolderChipRow extends StatelessWidget {
       ),
     );
   }
+}
 
-  Future<void> _showFolderChipMenu(BuildContext context, NotebookFolder folder) async {
-    final l10n = AppLocalizations.of(context);
+/// Wide-window navigation: folders with counts, trash, settings, sync state.
+class _Sidebar extends ConsumerWidget {
+  final List<NotebookFolder> folders;
+  final List<NotebookEntry> entries;
+  final Map<String, String> folderOf;
+  final String? selectedFolderId;
+  final ValueChanged<String?> onSelect;
+  final VoidCallback onCreateFolder;
+  final ValueChanged<NotebookFolder> onRenameFolder;
+  final ValueChanged<NotebookFolder> onDeleteFolder;
+  final VoidCallback onTrash;
+  final VoidCallback onSettings;
+
+  const _Sidebar({
+    required this.folders,
+    required this.entries,
+    required this.folderOf,
+    required this.selectedFolderId,
+    required this.onSelect,
+    required this.onCreateFolder,
+    required this.onRenameFolder,
+    required this.onDeleteFolder,
+    required this.onTrash,
+    required this.onSettings,
+  });
+
+  static const width = 248.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = HwThemeScope.of(context);
-    final action = await showScrollableSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: p.paper0,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+    final l10n = AppLocalizations.of(context);
+    final (syncIcon, syncLabel) = _syncFooterInfo(ref, l10n);
+    int countIn(String id) =>
+        entries.where((e) => folderOf[e.metadata.id] == id).length;
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        // Heavier material than the content: separates structure from content.
+        color: Color.alphaBlend(p.ink0.withValues(alpha: 0.035), p.paper1),
+        border: Border(right: BorderSide(color: p.paper3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 16, 18),
+            child: Row(children: [
+              Image.asset('assets/branding/logo.png', width: 26, height: 26),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(l10n.libAppName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: HwType.title.copyWith(
+                        color: p.ink0, fontSize: 17, letterSpacing: -0.25)),
+              ),
+            ]),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              children: [
+                _SideItem(
+                  icon: 'pages',
+                  label: l10n.libAllNotebooks,
+                  count: entries.length,
+                  selected: selectedFolderId == null,
+                  onTap: () => onSelect(null),
+                ),
+                for (final f in folders)
+                  _SideItem(
+                    icon: 'folder',
+                    label: f.name,
+                    count: countIn(f.id),
+                    selected: selectedFolderId == f.id,
+                    onTap: () => onSelect(f.id),
+                    onMenu: () => _showFolderMenu(context, f,
+                        onRename: onRenameFolder, onDelete: onDeleteFolder),
+                  ),
+                _SideItem(
+                  icon: 'plus',
+                  label: l10n.libNewFolder,
+                  muted: true,
+                  onTap: onCreateFolder,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Column(children: [
+              _SideItem(icon: 'trash', label: l10n.setTrash, onTap: onTrash),
+              _SideItem(
+                  icon: 'settings',
+                  label: l10n.setSettingsTitle,
+                  onTap: onSettings),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 12, 14),
+            child: Row(children: [
+              HwIcon(syncIcon, size: 15, color: p.ink2),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(syncLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: HwType.footnote.copyWith(color: p.ink2)),
+              ),
+              const SyncRefreshButton(),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideItem extends StatefulWidget {
+  final String icon;
+  final String label;
+  final int? count;
+  final bool selected;
+  final bool muted;
+  final VoidCallback onTap;
+  final VoidCallback? onMenu;
+
+  const _SideItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.count,
+    this.selected = false,
+    this.muted = false,
+    this.onMenu,
+  });
+
+  @override
+  State<_SideItem> createState() => _SideItemState();
+}
+
+class _SideItemState extends State<_SideItem> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HwThemeScope.of(context);
+    final sel = widget.selected;
+    final fg = sel ? p.accentDeep : (widget.muted ? p.ink2 : p.ink0);
+    return Semantics(
+      button: true,
+      selected: sel,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          onLongPress: widget.onMenu,
+          onSecondaryTap: widget.onMenu,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: sel
+                  ? p.accentSoft
+                  : _hover
+                      ? p.ink0.withValues(alpha: 0.05)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(HwTheme.rSm + 1),
+            ),
+            child: Row(children: [
+              HwIcon(widget.icon,
+                  size: 17, color: sel ? p.accent : p.ink2),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                        color: fg)),
+              ),
+              if (widget.count != null)
+                Text('${widget.count}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: sel ? p.accentDeep : p.ink3,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    )),
+            ]),
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      ),
+    );
+  }
+}
+
+/// Folder name + count; fades as it scrolls under the bar, where the
+/// inline title takes over.
+class _LargeTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final ScrollController scroll;
+  final double hPad;
+
+  const _LargeTitle({
+    required this.title,
+    required this.subtitle,
+    required this.scroll,
+    required this.hPad,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HwThemeScope.of(context);
+    return AnimatedBuilder(
+      animation: scroll,
+      builder: (context, child) {
+        final y = scroll.hasClients ? scroll.offset : 0.0;
+        return Opacity(
+            opacity: (1 - (y - 4) / 28).clamp(0.0, 1.0), child: child);
+      },
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(hPad, 2, hPad, 10),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration:
-                    BoxDecoration(color: p.paper3, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () => Navigator.of(ctx).pop('rename'),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-                child: Row(children: [
-                  HwIcon('pen', size: 18, color: p.ink1),
-                  const SizedBox(width: 12),
-                  Text(l10n.libRenameFolder, style: TextStyle(color: p.ink0, fontSize: 14)),
-                ]),
-              ),
-            ),
-            InkWell(
-              onTap: () => Navigator.of(ctx).pop('delete'),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-                child: Row(children: [
-                  HwIcon('trash', size: 18, color: HwTheme.syncConflict),
-                  const SizedBox(width: 12),
-                  Text(l10n.libDeleteFolder,
-                      style: TextStyle(color: HwTheme.syncConflict, fontSize: 14)),
-                ]),
-              ),
-            ),
+            Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: HwType.largeTitle.copyWith(color: p.ink0)),
+            const SizedBox(height: 2),
+            Text(subtitle,
+                style: HwType.footnote.copyWith(color: p.ink2, fontSize: 13.5)),
           ],
         ),
       ),
     );
-    if (action == 'rename') onRename(folder);
-    if (action == 'delete') onDelete(folder);
   }
 }
 
+(String, String) _syncFooterInfo(WidgetRef ref, AppLocalizations l10n) {
+  final backend = ref.watch(appSettingsProvider.select((s) => s.syncBackend));
+  return ref.watch(remoteStoreProvider) == null
+      ? ('cloud-off', l10n.libLocalOnlyBadge)
+      : backend == SyncBackend.drive
+          ? ('cloud-check', l10n.setSyncDriveTitle)
+          : ('cloud-check', l10n.libFooterWebdav);
+}
+
 // ─── Top bar ─────────────────────────────────────────────────────
+/// Floats over the list: clear at rest, glass once content slides under it.
 class _TopBar extends StatelessWidget {
+  static const double height = 60;
+
+  final ScrollController scroll;
+  final String title;
+  final bool wide;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final bool gridView;
@@ -1575,6 +1894,9 @@ class _TopBar extends StatelessWidget {
   final String sortLabel;
 
   const _TopBar({
+    required this.scroll,
+    required this.title,
+    required this.wide,
     required this.searchController,
     required this.onSearchChanged,
     required this.gridView,
@@ -1590,135 +1912,117 @@ class _TopBar extends StatelessWidget {
     final p = HwThemeScope.of(context);
     final l10n = AppLocalizations.of(context);
     return LayoutBuilder(builder: (ctx, c) {
-      final isCompact = c.maxWidth < 720;
-      final iconOnly = !isCompact && c.maxWidth < 1100;
-      final hPad = isCompact ? 16.0 : 32.0;
-      return Container(
-        padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 14),
-        decoration: BoxDecoration(
-          color: p.paper0,
-          border: Border(bottom: BorderSide(color: p.paper3)),
-        ),
-        child: Row(
-          children: [
-            // On a phone the wordmark yields (at a large font scale it alone
-            // pushed the search field off the bar) and there is no Spacer:
-            // the search field owns the rest of the row. On wide layouts the
-            // wordmark is rigid and the Spacer pins everything else right.
-            if (isCompact)
-              Flexible(
-                child: Text(l10n.libAppName,
+      final isCompact = c.maxWidth < 640;
+      final iconOnly = !isCompact && c.maxWidth < 980;
+      final hPad = isCompact ? 12.0 : (wide ? 24.0 : 20.0);
+      final row = Row(
+        children: [
+          if (isCompact)
+            Expanded(
+              child: HwTextField(
+                controller: searchController,
+                hint: l10n.libSearchHintShort,
+                leading: const HwIcon('search', size: 16),
+                onChanged: onSearchChanged,
+                width: double.infinity,
+              ),
+            )
+          else ...[
+            Expanded(
+              child: AnimatedBuilder(
+                animation: scroll,
+                builder: (_, child) {
+                  final y = scroll.hasClients ? scroll.offset : 0.0;
+                  return Opacity(
+                      opacity: ((y - 28) / 18).clamp(0.0, 1.0), child: child);
+                },
+                child: Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
-                      color: p.ink0,
-                    )),
-              )
-            else ...[
-              Text(l10n.libAppName,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
-                    color: p.ink0,
-                  )),
-            ],
-            const SizedBox(width: 8),
-            // Search field — full width on phone, up to 240 on wide (shrinks
-            // before anything else overflows).
-            if (isCompact)
-              Expanded(
-                child: HwTextField(
-                  controller: searchController,
-                  hint: l10n.libSearchHintShort,
-                  leading: const HwIcon('search', size: 16),
-                  onChanged: onSearchChanged,
-                  width: double.infinity,
-                ),
-              )
+                    style: HwType.headline.copyWith(color: p.ink0, fontSize: 16)),
+              ),
+            ),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
+              child: HwTextField(
+                controller: searchController,
+                hint: l10n.libSearchHintNotebooks,
+                leading: const HwIcon('search', size: 16),
+                onChanged: onSearchChanged,
+                width: double.infinity,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _ViewToggle(gridView: gridView, onChanged: onViewToggle),
+            const SizedBox(width: 6),
+            if (iconOnly)
+              HwButton.icon(
+                  icon: const HwIcon('sort', size: 16),
+                  tooltip: l10n.libSortWithLabel(sortLabel),
+                  onPressed: onSortTap)
             else
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 240),
-                    child: HwTextField(
-                      controller: searchController,
-                      hint: l10n.libSearchHintNotebooks,
-                      leading: const HwIcon('search', size: 16),
-                      onChanged: onSearchChanged,
-                      width: double.infinity,
-                    ),
-                  ),
-                ),
+              HwButton(
+                leading: const HwIcon('sort', size: 16),
+                label: sortLabel,
+                onPressed: onSortTap,
               ),
-            const SizedBox(width: 8),
-            // Wide-only: view toggle, sort label, divider, big "Importa".
-            if (!isCompact) ...[
-              const HwDivider(),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: p.paper2,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(children: [
-                  _SegBtn(
-                      icon: 'grid',
-                      selected: gridView,
-                      onTap: () => onViewToggle(true)),
-                  _SegBtn(
-                      icon: 'list',
-                      selected: !gridView,
-                      onTap: () => onViewToggle(false)),
-                ]),
-              ),
-              const SizedBox(width: 12),
-              if (iconOnly)
-                HwButton.icon(
-                    icon: const HwIcon('sort', size: 16),
-                    tooltip: l10n.libSortWithLabel(sortLabel),
-                    onPressed: onSortTap)
-              else
-                HwButton(
-                  leading: const HwIcon('sort', size: 16),
-                  label: sortLabel,
-                  onPressed: onSortTap,
-                ),
-              const SizedBox(width: 12),
-              const HwDivider(),
-              const SizedBox(width: 12),
-              if (iconOnly)
-                HwButton.icon(
-                    icon: const HwIcon('export', size: 16),
-                    tooltip: l10n.libImportTooltip,
-                    onPressed: onImportTap)
-              else
-                HwButton(
-                  leading: const HwIcon('export', size: 16),
-                  label: l10n.libImport,
+            if (iconOnly)
+              HwButton.icon(
+                  icon: const HwIcon('export', size: 16),
                   tooltip: l10n.libImportTooltip,
-                  onPressed: onImportTap,
-                ),
-              const SizedBox(width: 4),
+                  onPressed: onImportTap)
+            else
+              HwButton(
+                leading: const HwIcon('export', size: 16),
+                label: l10n.libImport,
+                tooltip: l10n.libImportTooltip,
+                onPressed: onImportTap,
+              ),
+            if (!wide)
               HwButton.icon(
                   icon: const HwIcon('settings', size: 16),
                   tooltip: l10n.libSettingsTooltip,
                   onPressed: onSettingsTap),
-            ] else ...[
-              // Compact: collapse view toggle / sort / import / settings
-              // into a single overflow menu. Saves ~360px of bar width.
-              HwButton.icon(
-                icon: const HwIcon('more', size: 16),
-                tooltip: l10n.libMoreTooltip,
-                onPressed: () => _compactMenu(ctx),
-              ),
-            ],
           ],
+          if (isCompact) ...[
+            const SizedBox(width: 4),
+            HwButton.icon(
+              icon: const HwIcon('more', size: 18),
+              tooltip: l10n.libMoreTooltip,
+              onPressed: () => _compactMenu(ctx),
+            ),
+          ],
+        ],
+      );
+      return AnimatedBuilder(
+        animation: scroll,
+        builder: (_, child) {
+          final y = scroll.hasClients ? scroll.offset : 0.0;
+          final edge = (y / 20).clamp(0.0, 1.0);
+          if (edge == 0) return child!;
+          // Materialize: blur and fill grow together with the scroll.
+          return ClipRect(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 20 * edge, sigmaY: 20 * edge),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: p.glass.withValues(alpha: p.glass.a * edge),
+                  border: Border(
+                      bottom: BorderSide(
+                          color: p.glassLine.withValues(
+                              alpha: p.glassLine.a * edge))),
+                ),
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: SizedBox(
+          height: height,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: hPad),
+            child: row,
+          ),
         ),
       );
     });
@@ -1732,7 +2036,7 @@ class _TopBar extends StatelessWidget {
         context: context,
         backgroundColor: p.paper0,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HwTheme.rXl)),
         ),
         builder: (ctx) => SafeArea(
         child: Column(
@@ -1785,49 +2089,86 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _SegBtn extends StatelessWidget {
-  final String icon;
-  final bool selected;
-  final VoidCallback onTap;
-  const _SegBtn(
-      {required this.icon, required this.selected, required this.onTap});
+/// Grid/list segmented control; the thumb slides on a spring.
+class _ViewToggle extends StatelessWidget {
+  final bool gridView;
+  final ValueChanged<bool> onChanged;
+  const _ViewToggle({required this.gridView, required this.onChanged});
+
+  static const _seg = 34.0;
 
   @override
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: selected ? p.paper0 : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: selected ? hwShadow1(p.brightness) : null,
+    Widget seg(String icon, bool value) => Tooltip(
+          message: value
+              ? AppLocalizations.of(context).libViewAsGrid
+              : AppLocalizations.of(context).libViewAsList,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onChanged(value),
+              child: SizedBox(
+                width: _seg,
+                height: 28,
+                child: Center(
+                  child: HwIcon(icon,
+                      size: 16, color: gridView == value ? p.ink0 : p.ink2),
+                ),
+              ),
+            ),
           ),
-          child: HwIcon(icon, size: 16, color: selected ? p.ink0 : p.ink2),
-        ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: p.paper2,
+        borderRadius: BorderRadius.circular(HwTheme.rSm + 2),
       ),
+      child: Stack(children: [
+        HwSpringOffset(
+          offset: Offset(gridView ? 0 : _seg, 0),
+          child: Container(
+            width: _seg,
+            height: 28,
+            decoration: BoxDecoration(
+              color: p.isDark ? p.paper3 : p.paper0,
+              borderRadius: BorderRadius.circular(HwTheme.rSm),
+              boxShadow: hwShadow1(p.brightness),
+            ),
+          ),
+        ),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          seg('grid', true),
+          seg('list', false),
+        ]),
+      ]),
     );
   }
 }
 
 // ─── Body ─────────────────────────────────────────────────────────
 class _Body extends StatelessWidget {
+  final ScrollController controller;
+  /// Title, folder chips and notices: scroll with the content.
+  final List<Widget> headerSlivers;
+  final double hPad;
   final List<NotebookEntry> entries;
   final List<NotebookEntry> sketches;
   final bool gridView;
   final String searchQuery;
   final Set<String> favoriteIds;
-  final ValueChanged<NotebookEntry> onOpen;
+  final void Function(NotebookEntry entry, {Rect? origin}) onOpen;
   final VoidCallback onCreate;
   final VoidCallback onCreateSketch;
   final ValueChanged<NotebookEntry> onLongPress;
   final ValueChanged<NotebookEntry> onToggleFavorite;
 
   const _Body({
+    required this.controller,
+    required this.headerSlivers,
+    required this.hPad,
     required this.entries,
     required this.sketches,
     required this.gridView,
@@ -1844,9 +2185,14 @@ class _Body extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
     return CustomScrollView(
+      controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
+        const SliverToBoxAdapter(child: SizedBox(height: _TopBar.height)),
+        ...headerSlivers,
         SliverToBoxAdapter(
           child: _SketchSection(
+            hPad: hPad,
             sketches: sketches,
             onCreateSketch: onCreateSketch,
             onOpen: onOpen,
@@ -1855,7 +2201,7 @@ class _Body extends StatelessWidget {
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 8, 32, 20),
+            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 18),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -1873,20 +2219,8 @@ class _Body extends StatelessWidget {
                             AppLocalizations.of(context).libYourNotebooks,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: p.ink0,
-                            )),
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                            AppLocalizations.of(context)
-                                .libItemsCount(entries.length),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, color: p.ink2)),
+                            style: HwType.title
+                                .copyWith(color: p.ink0, fontSize: 17)),
                       ),
                     ],
                   ),
@@ -1909,7 +2243,7 @@ class _Body extends StatelessWidget {
         if (searchQuery.isNotEmpty && entries.isEmpty && sketches.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 16),
               child: Text(
                   AppLocalizations.of(context).qlSearchNoResults(searchQuery),
                   style: TextStyle(fontSize: 14, color: p.ink2)),
@@ -1917,7 +2251,7 @@ class _Body extends StatelessWidget {
           ),
         if (gridView)
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: EdgeInsets.symmetric(horizontal: hPad),
             sliver: SliverLayoutBuilder(
               builder: (ctx, constraints) {
                 // Adapt cover-tile sizing to the available width so the
@@ -1944,8 +2278,8 @@ class _Body extends StatelessWidget {
                   gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: maxExtent,
                     mainAxisExtent: mainExtent,
-                    crossAxisSpacing: 32,
-                    mainAxisSpacing: 40,
+                    crossAxisSpacing: width < 480 ? 16 : 28,
+                    mainAxisSpacing: width < 480 ? 24 : 36,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (ctx, i) {
@@ -1954,7 +2288,7 @@ class _Body extends StatelessWidget {
                       return _CoverTile(
                         entry: e,
                         favorite: favoriteIds.contains(e.metadata.id),
-                        onTap: () => onOpen(e),
+                        onTap: (r) => onOpen(e, origin: r),
                         onLongPress: () => onLongPress(e),
                         onToggleFavorite: () => onToggleFavorite(e),
                       );
@@ -1967,7 +2301,7 @@ class _Body extends StatelessWidget {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: EdgeInsets.symmetric(horizontal: hPad - 8),
             sliver: SliverList.builder(
               itemCount: entries.length,
               itemBuilder: (_, i) => _ListRow(
@@ -1986,11 +2320,13 @@ class _Body extends StatelessWidget {
 
 // ─── Sketch (infinite canvas) section ─────────────────────────────
 class _SketchSection extends StatelessWidget {
+  final double hPad;
   final List<NotebookEntry> sketches;
   final VoidCallback onCreateSketch;
-  final ValueChanged<NotebookEntry> onOpen;
+  final void Function(NotebookEntry entry, {Rect? origin}) onOpen;
   final ValueChanged<NotebookEntry> onLongPress;
   const _SketchSection({
+    required this.hPad,
     required this.sketches,
     required this.onCreateSketch,
     required this.onOpen,
@@ -2001,7 +2337,7 @@ class _SketchSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 4),
+      padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2019,11 +2355,8 @@ class _SketchSection extends StatelessWidget {
                       child: Text(AppLocalizations.of(context).libSketches,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: p.ink0,
-                          )),
+                          style: HwType.title
+                              .copyWith(color: p.ink0, fontSize: 17)),
                     ),
                     const SizedBox(width: 12),
                     Flexible(
@@ -2311,7 +2644,8 @@ class _DottedBorderPainter extends CustomPainter {
 class _CoverTile extends StatelessWidget {
   final NotebookEntry entry;
   final bool favorite;
-  final VoidCallback onTap;
+  /// Receives the cover's global rect, for the open transition.
+  final ValueChanged<Rect?> onTap;
   final VoidCallback onLongPress;
   final VoidCallback onToggleFavorite;
   const _CoverTile({
@@ -2374,7 +2708,7 @@ class _CoverTile extends StatelessWidget {
                       // menu as long-press.
                       onSecondaryTap: onLongPress,
                       behavior: HitTestBehavior.translucent,
-                      child: NotebookCover(
+                      child: Builder(builder: (coverCtx) => NotebookCover(
                         color: Color(entry.metadata.coverColor),
                         title: entry.metadata.title,
                         // Hide the cover's built-in star — we render our own
@@ -2383,8 +2717,13 @@ class _CoverTile extends StatelessWidget {
                         texture: _textureFor(entry.metadata.paperType),
                         width: coverWidth,
                         height: coverHeight,
-                        onTap: onTap,
-                      ),
+                        onTap: () {
+                          final box = coverCtx.findRenderObject() as RenderBox?;
+                          onTap(box == null || !box.hasSize
+                              ? null
+                              : box.localToGlobal(Offset.zero) & box.size);
+                        },
+                      )),
                     ),
                   ),
                   Positioned(
@@ -2558,21 +2897,16 @@ class _FooterBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final p = HwThemeScope.of(context);
     final l10n = AppLocalizations.of(context);
-    final backend = ref.watch(appSettingsProvider.select((s) => s.syncBackend));
-    final (footerIcon, footerLabel) = ref.watch(remoteStoreProvider) == null
-        ? ('cloud-off', l10n.libLocalOnlyBadge)
-        : backend == SyncBackend.drive
-            ? ('cloud-check', l10n.setSyncDriveTitle)
-            : ('cloud-check', l10n.libFooterWebdav);
+    final (footerIcon, footerLabel) = _syncFooterInfo(ref, l10n);
     return LayoutBuilder(builder: (ctx, c) {
       // Both captions at full size overflow a phone's width — more so at a
       // large system font scale — so they share the row and ellipsize.
       final compact = c.maxWidth < 600;
       return Container(
         padding: EdgeInsets.symmetric(
-            horizontal: compact ? 16 : 32, vertical: 14),
+            horizontal: compact ? 16 : 24, vertical: 10),
         decoration: BoxDecoration(
-          color: p.paper0,
+          color: p.paper1,
           border: Border(top: BorderSide(color: p.paper3)),
         ),
         child: Row(

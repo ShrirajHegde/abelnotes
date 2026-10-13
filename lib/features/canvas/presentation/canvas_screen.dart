@@ -49,6 +49,8 @@ import 'package:abelnotes/features/canvas/presentation/canvas_painter_notifiers.
 import 'package:abelnotes/features/canvas/presentation/canvas_crop_dialog.dart';
 import 'package:abelnotes/features/canvas/presentation/page_manager_sheet.dart';
 import 'package:abelnotes/ui/editor/hw_editor_chrome.dart';
+import 'package:abelnotes/ui/primitives/hw_motion_widgets.dart';
+import 'package:abelnotes/ui/theme/hw_motion.dart';
 import 'package:abelnotes/ui/primitives/sync_badge.dart';
 import 'package:abelnotes/ui/screens/library_screen.dart';
 import 'package:abelnotes/ui/theme/hw_theme.dart';
@@ -82,7 +84,15 @@ class CanvasScreen extends ConsumerStatefulWidget {
 }
 
 class _CanvasScreenState extends ConsumerState<CanvasScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
+  // Released dock glides to its edge on these, carrying the throw velocity.
+  late final AnimationController _dockFlyX = AnimationController.unbounded(vsync: this)
+    ..addListener(_onDockFly);
+  late final AnimationController _dockFlyY = AnimationController.unbounded(vsync: this)
+    ..addListener(_onDockFly);
+  /// Bumped when a new drag grabs the dock, so a cancelled flight's late
+  /// completion can't drop the dock back to its edge mid-drag.
+  int _dockFlyGen = 0;
   bool _isSaving = false;
   Future<void>? _saveInFlight;
   bool _closing = false;
@@ -709,7 +719,13 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     final dockBox = dockCtx.findRenderObject() as RenderBox?;
     final stackBox = stackCtx.findRenderObject() as RenderBox?;
     if (dockBox == null || stackBox == null) return;
-    final topLeft = stackBox.globalToLocal(dockBox.localToGlobal(Offset.zero));
+    final flying = _dockFlyX.isAnimating || _dockFlyY.isAnimating;
+    _dockFlyGen++;
+    _dockFlyX.stop();
+    _dockFlyY.stop();
+    final topLeft = flying && _dockDragOffset != null
+        ? _dockDragOffset!
+        : stackBox.globalToLocal(dockBox.localToGlobal(Offset.zero));
     // Grabbing the dock cancels any pending canvas long-press so the
     // context menu can't fire mid-drag (e.g. a resting finger started the
     // 600ms timer just before the other hand grabbed the grip).
@@ -717,6 +733,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     setState(() {
       _dockDragSize = dockBox.size;
       _dockDragOffset = topLeft;
+      _dockRawOffset = topLeft;
       // A panel that floats around mid-drag is more distracting than
       // useful — close it; the user reopens it after parking the dock.
       _popupOpen = false;
@@ -724,30 +741,70 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     HapticFeedback.selectionClick();
   }
 
+  /// Unresisted drag position; the shown one rubber-bands past the edges.
+  Offset _dockRawOffset = Offset.zero;
+
+  double _dockBand(double v, double maxV) {
+    if (v < 0) return -hwRubberband(-v, 160);
+    if (v > maxV) return maxV + hwRubberband(v - maxV, 160);
+    return v;
+  }
+
   void _onDockDragUpdate(DragUpdateDetails d) {
-    final base = _dockDragOffset;
-    if (base == null) return;
-    var next = base + d.delta;
+    if (_dockDragOffset == null) return;
+    _dockRawOffset += d.delta;
     final area = _dockArea;
+    var next = _dockRawOffset;
     if (area.width > 0 && area.height > 0) {
-      // Keep the whole dock on-screen while dragging.
       next = Offset(
-        next.dx.clamp(0.0, max(0.0, area.width - _dockDragSize.width)),
-        next.dy.clamp(0.0, max(0.0, area.height - _dockDragSize.height)),
+        _dockBand(next.dx, max(0.0, area.width - _dockDragSize.width)),
+        _dockBand(next.dy, max(0.0, area.height - _dockDragSize.height)),
       );
     }
     setState(() => _dockDragOffset = next);
   }
 
-  void _onDockDragEnd(DragEndDetails _) {
+  void _onDockFly() {
+    if (!mounted) return;
+    setState(() => _dockDragOffset = Offset(_dockFlyX.value, _dockFlyY.value));
+  }
+
+  /// Where the docked layout puts a dock of the given orientation; mirrors
+  /// [_dockedPositioned] and the dock's own size maths.
+  Offset _dockedTopLeft(String edge, double align, Size area) {
+    final vert = edge == 'left' || edge == 'right';
+    final availMain = vert
+        ? area.height - _dockTopInset - _dockBottomInset
+        : area.width - _dockSideInset * 2;
+    final m = HwFloatingDock.metricsFor(availMain);
+    final main = min(m.extent, availMain);
+    final cross = m.thickness;
+    if (vert) {
+      final x = edge == 'left'
+          ? _dockSideInset
+          : area.width - _dockSideInset - cross;
+      return Offset(x, _dockTopInset + (availMain - main) * align);
+    }
+    final y = edge == 'top'
+        ? _dockTopInset
+        : area.height - _dockBottomInset - cross;
+    return Offset(_dockSideInset + (availMain - main) * align, y);
+  }
+
+  void _onDockDragEnd(DragEndDetails d) {
     final off = _dockDragOffset;
     final area = _dockArea;
     if (off == null || area.width <= 0 || area.height <= 0) {
       setState(() => _dockDragOffset = null);
       return;
     }
-    final center = off +
-        Offset(_dockDragSize.width / 2, _dockDragSize.height / 2);
+    // Choose the edge from where the throw is heading, not where it let go.
+    final v = d.velocity.pixelsPerSecond;
+    final projected = off + Offset(hwProject(v.dx), hwProject(v.dy));
+    final center = Offset(
+      projected.dx.clamp(0.0, area.width - _dockDragSize.width),
+      projected.dy.clamp(0.0, area.height - _dockDragSize.height),
+    ) + Offset(_dockDragSize.width / 2, _dockDragSize.height / 2);
     // Snap to whichever of the four edges the dock's centre is nearest.
     final dLeft = center.dx;
     final dRight = area.width - center.dx;
@@ -775,8 +832,25 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
           center.dy, _dockTopInset, area.height - _dockBottomInset);
     }
 
-    setState(() => _dockDragOffset = null);
     ref.read(appSettingsProvider.notifier).setToolDock(edge, align);
+    final target = _dockedTopLeft(edge, align, area);
+    final instant = hwReduceMotion(context);
+    final spring = v.distance > 600 ? HwSprings.fling : hwSpring(response: 0.4);
+    _dockFlyX.value = off.dx;
+    _dockFlyY.value = off.dy;
+    var done = 0;
+    final gen = ++_dockFlyGen;
+    void land() {
+      if (++done == 2 && mounted && gen == _dockFlyGen) {
+        setState(() => _dockDragOffset = null);
+      }
+    }
+    _dockFlyX
+        .springTo(target.dx, spring: spring, velocity: v.dx, instant: instant)
+        .whenCompleteOrCancel(land);
+    _dockFlyY
+        .springTo(target.dy, spring: spring, velocity: v.dy, instant: instant)
+        .whenCompleteOrCancel(land);
     HapticFeedback.lightImpact();
   }
 
@@ -1283,6 +1357,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
 
   @override
   void dispose() {
+    _dockFlyX.dispose();
+    _dockFlyY.dispose();
     _hintMessenger?.hideCurrentSnackBar();
     WidgetsBinding.instance.removeObserver(this);
     PenInputChannel.unregister();
@@ -4791,11 +4867,20 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
               // Tool option popup — anchored next to the dock wherever it
               // is parked (above for bottom, below for top, beside for
               // left/right).
-              if (_popupOpen && !_presentationMode)
+              if (!_presentationMode)
                 _popupPositioned(
                   dockPosition,
                   toolDock.align,
                   _dockArea,
+                  HwMaterialize(
+                  visible: _popupOpen,
+                  alignment: switch (dockPosition) {
+                    DockPosition.left => Alignment.centerLeft,
+                    DockPosition.right => Alignment.centerRight,
+                    DockPosition.top => Alignment.topCenter,
+                    _ => Alignment.bottomCenter,
+                  },
+                  child:
                   // Absorb taps so a near-miss on the small color chips
                   // (or any empty spot inside the panel) doesn't fall
                   // through to the canvas "tap closes popup" handler —
@@ -4874,6 +4959,7 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                       },
                       onClose: () => setState(() => _popupOpen = false),
                     ),
+                  ),
                   ),
                 ),
               const RemoteChangesBanner(),

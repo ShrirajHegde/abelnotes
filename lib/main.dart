@@ -37,6 +37,11 @@ void main(List<String> args) async {
           .loadString('assets/licenses/onenote_parser_LICENSE.txt');
       yield LicenseEntryWithLineBreaks(const ['onenote_parser'], text);
     });
+    LicenseRegistry.addLicense(() async* {
+      final text =
+          await rootBundle.loadString('assets/fonts/InstrumentSans-OFL.txt');
+      yield LicenseEntryWithLineBreaks(const ['Instrument Sans'], text);
+    });
 
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       sqfliteFfiInit();

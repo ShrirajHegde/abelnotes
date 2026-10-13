@@ -135,6 +135,22 @@ flutter:
     # MPL-2.0 attribution for the onenote_parser crate used by the OneNote
     # import bridge (native/onenote_bridge) — registered in LicenseRegistry.
     - assets/licenses/onenote_parser_LICENSE.txt
+    # OFL-1.1 text for the bundled Instrument Sans, registered in LicenseRegistry.
+    - assets/fonts/InstrumentSans-OFL.txt
+
+  # UI face, same as abelnotes.app. SIL Open Font License 1.1.
+  fonts:
+    - family: InstrumentSans
+      fonts:
+        - asset: assets/fonts/InstrumentSans-Regular.ttf
+        - asset: assets/fonts/InstrumentSans-Italic.ttf
+          style: italic
+        - asset: assets/fonts/InstrumentSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/InstrumentSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/InstrumentSans-Bold.ttf
+          weight: 700
 
 # ── App icon generation ──────────────────────────────────────────────
 # Drop ONE square 1024x1024 PNG at assets/icon/app_icon.png, then run:
