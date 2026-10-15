@@ -60,6 +60,7 @@ class ImportService {
       syncStatus: 'modified',
       fileSize: bytes.length,
       coverColor: metadata.coverColor,
+      coverStyle: metadata.coverStyle,
       paperType: metadata.paperType,
       pageCount: metadata.pageCount,
       createdAt: metadata.createdAt,

@@ -827,6 +827,45 @@ class AppLocalizationsPt extends AppLocalizations {
   String get libChangeCover => 'Mudar a capa';
 
   @override
+  String get libCoverColor => 'Cor';
+
+  @override
+  String get libCoverPattern => 'Padrão';
+
+  @override
+  String get libCoverApply => 'Aplicar';
+
+  @override
+  String get libCoverStyleAuto => 'Automático (pelo tipo de papel)';
+
+  @override
+  String get libCoverStylePlain => 'Liso';
+
+  @override
+  String get libCoverStylePinstripe => 'Risca de giz';
+
+  @override
+  String get libCoverStyleDiagonal => 'Listras diagonais';
+
+  @override
+  String get libCoverStylePolka => 'Bolinhas';
+
+  @override
+  String get libCoverStyleGingham => 'Xadrez vichy';
+
+  @override
+  String get libCoverStyleWaves => 'Ondas';
+
+  @override
+  String get libCoverStyleLabel => 'Etiqueta';
+
+  @override
+  String get libCoverStyleTwoTone => 'Bicolor';
+
+  @override
+  String get libCoverStyleSheen => 'Brilho';
+
+  @override
   String get libMoveToFolder => 'Mover para uma pasta';
 
   @override

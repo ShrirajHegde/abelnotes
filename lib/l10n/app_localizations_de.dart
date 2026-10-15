@@ -831,6 +831,45 @@ class AppLocalizationsDe extends AppLocalizations {
   String get libChangeCover => 'Einband ändern';
 
   @override
+  String get libCoverColor => 'Farbe';
+
+  @override
+  String get libCoverPattern => 'Muster';
+
+  @override
+  String get libCoverApply => 'Übernehmen';
+
+  @override
+  String get libCoverStyleAuto => 'Automatisch (nach Papiertyp)';
+
+  @override
+  String get libCoverStylePlain => 'Einfarbig';
+
+  @override
+  String get libCoverStylePinstripe => 'Nadelstreifen';
+
+  @override
+  String get libCoverStyleDiagonal => 'Diagonale Streifen';
+
+  @override
+  String get libCoverStylePolka => 'Punkte';
+
+  @override
+  String get libCoverStyleGingham => 'Vichy-Karo';
+
+  @override
+  String get libCoverStyleWaves => 'Wellen';
+
+  @override
+  String get libCoverStyleLabel => 'Etikett';
+
+  @override
+  String get libCoverStyleTwoTone => 'Zweifarbig';
+
+  @override
+  String get libCoverStyleSheen => 'Glanz';
+
+  @override
   String get libMoveToFolder => 'In Ordner verschieben';
 
   @override

@@ -1182,16 +1182,16 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2>
           await _exportNotebook(entry);
           break;
         case 'cover':
-          final newColor = await _pickCoverColor(
-              initial: Color(entry.metadata.coverColor));
-          if (newColor != null) {
-            final argb = (newColor.a * 255).round() << 24 |
-                (newColor.r * 255).round() << 16 |
-                (newColor.g * 255).round() << 8 |
-                (newColor.b * 255).round();
+          final picked = await _pickCover(entry);
+          if (picked != null) {
+            final c = picked.color;
+            final argb = (c.a * 255).round() << 24 |
+                (c.r * 255).round() << 16 |
+                (c.g * 255).round() << 8 |
+                (c.b * 255).round();
             await ref
                 .read(notebookListProvider.notifier)
-                .updateNotebookCover(entry, argb);
+                .updateNotebookCover(entry, argb, picked.style.key);
           }
           break;
         case 'delete':
@@ -1393,52 +1393,117 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2>
   }
 
   /// Bottom sheet to pick one of the 8 preset cover colours.
-  Future<Color?> _pickCoverColor({Color? initial}) async {
-    return showScrollableSheet<Color>(
+  Future<({Color color, CoverStyle style})?> _pickCover(
+      NotebookEntry entry) async {
+    var color = Color(entry.metadata.coverColor);
+    var style = CoverStyle.fromKey(entry.metadata.coverStyle);
+    final texture = _textureFor(entry.metadata.paperType);
+    return showModalBottomSheet<({Color color, CoverStyle style})>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: HwThemeScope.of(context).paper0,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(AppLocalizations.of(context).libChangeCover,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final c in HwTheme.covers)
-                    GestureDetector(
-                      onTap: () => Navigator.of(ctx).pop(c),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: c,
-                          borderRadius: BorderRadius.circular(8),
-                          border: initial?.toARGB32() == c.toARGB32()
-                              ? Border.all(
-                                  color:
-                                      HwThemeScope.of(context).ink0,
-                                  width: 2)
-                              : null,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        final p = HwThemeScope.of(ctx);
+        final l10n = AppLocalizations.of(ctx);
+        const sectionStyle =
+            TextStyle(fontSize: 12, fontWeight: FontWeight.w600);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.libChangeCover,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                Center(
+                  child: NotebookCover(
+                    color: color,
+                    title: entry.metadata.title,
+                    texture: texture,
+                    style: style,
+                    width: 150,
+                    height: 195,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(l10n.libCoverColor, style: sectionStyle),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final c in HwTheme.covers)
+                      GestureDetector(
+                        onTap: () => setSheet(() => color = c),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: c,
+                            borderRadius: BorderRadius.circular(8),
+                            border: color.toARGB32() == c.toARGB32()
+                                ? Border.all(color: p.ink0, width: 2)
+                                : null,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(l10n.libCoverPattern, style: sectionStyle),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final st in CoverStyle.values)
+                      Tooltip(
+                        message: _coverStyleName(l10n, st),
+                        child: Semantics(
+                          button: true,
+                          selected: st == style,
+                          label: _coverStyleName(l10n, st),
+                          child: GestureDetector(
+                            onTap: () => setSheet(() => style = st),
+                            child: _CoverStyleSwatch(
+                              color: color,
+                              style: st,
+                              texture: texture,
+                              selected: st == style,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(_coverStyleName(l10n, style),
+                    style: TextStyle(fontSize: 12, color: p.ink2)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text(l10n.libCancel)),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                        onPressed: () => Navigator.of(ctx)
+                            .pop((color: color, style: style)),
+                        child: Text(l10n.libCoverApply)),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -2748,6 +2813,7 @@ class _CoverTile extends StatelessWidget {
                       child: Builder(builder: (coverCtx) => NotebookCover(
                         color: Color(entry.metadata.coverColor),
                         title: entry.metadata.title,
+                        style: CoverStyle.fromKey(entry.metadata.coverStyle),
                         // Hide the cover's built-in star — we render our own
                         // tappable one above.
                         favorite: false,
@@ -2887,6 +2953,11 @@ class _ListRow extends StatelessWidget {
                     bottomRight: Radius.circular(4),
                   ),
                   boxShadow: hwShadow1(p.brightness),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: CustomPaint(
+                  painter: CoverPatternPainter(
+                      CoverStyle.fromKey(entry.metadata.coverStyle)),
                 ),
               ),
               const SizedBox(width: 16),
@@ -3409,6 +3480,55 @@ HwSyncState _syncStateOf(NotebookEntry e) {
   if (e.notOnDevice) return HwSyncState.notOnDevice;
   if (e.isLocal) return HwSyncState.pending;
   return HwSyncState.ok;
+}
+
+String _coverStyleName(AppLocalizations l10n, CoverStyle style) =>
+    switch (style) {
+      CoverStyle.auto => l10n.libCoverStyleAuto,
+      CoverStyle.plain => l10n.libCoverStylePlain,
+      CoverStyle.pinstripe => l10n.libCoverStylePinstripe,
+      CoverStyle.diagonal => l10n.libCoverStyleDiagonal,
+      CoverStyle.polka => l10n.libCoverStylePolka,
+      CoverStyle.gingham => l10n.libCoverStyleGingham,
+      CoverStyle.waves => l10n.libCoverStyleWaves,
+      CoverStyle.label => l10n.libCoverStyleLabel,
+      CoverStyle.twoTone => l10n.libCoverStyleTwoTone,
+      CoverStyle.sheen => l10n.libCoverStyleSheen,
+    };
+
+/// One pattern choice in the cover sheet, drawn in the chosen color.
+class _CoverStyleSwatch extends StatelessWidget {
+  final Color color;
+  final CoverStyle style;
+  final BackgroundTexture texture;
+  final bool selected;
+  const _CoverStyleSwatch({
+    required this.color,
+    required this.style,
+    required this.texture,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HwThemeScope.of(context);
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: selected ? p.ink0 : Colors.transparent, width: 2),
+      ),
+      child: NotebookCover(
+        color: color,
+        title: '',
+        texture: texture,
+        style: style,
+        width: 44,
+        height: 58,
+      ),
+    );
+  }
 }
 
 BackgroundTexture _textureFor(String paperType) {

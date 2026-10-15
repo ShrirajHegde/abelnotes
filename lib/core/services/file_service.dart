@@ -106,6 +106,7 @@ class FileService {
         sync_status TEXT NOT NULL DEFAULT 'synced',
         file_size INTEGER,
         cover_color INTEGER,
+        cover_style TEXT,
         paper_type TEXT,
         page_count INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -126,21 +127,33 @@ class FileService {
   }
 
   Future<void> _upgradeTables(Database db, int oldVersion, int newVersion) async {
+    // Each step checks the column first: an older build reopening this
+    // database sets the version back without dropping columns, and the
+    // next upgrade must not fail on one that is already there.
     if (oldVersion < 2) {
       // Notebooks the user chose to keep off the remote. Defaults to 0 so
       // every existing notebook keeps syncing exactly as it did — an opt-out
       // that silently opted people out would be the worst of both worlds.
-      await db.execute(
-          'ALTER TABLE notebooks ADD COLUMN local_only INTEGER NOT NULL '
-          'DEFAULT 0');
+      await _addColumnIfMissing(
+          db, 'local_only', 'INTEGER NOT NULL DEFAULT 0');
     }
     if (oldVersion < 3) {
       // Notebooks that live on the remote but that this device was told not
       // to keep. Per-device, so it is never uploaded anywhere.
-      await db.execute(
-          'ALTER TABLE notebooks ADD COLUMN download_skipped INTEGER NOT NULL '
-          'DEFAULT 0');
+      await _addColumnIfMissing(
+          db, 'download_skipped', 'INTEGER NOT NULL DEFAULT 0');
     }
+    if (oldVersion < 4) {
+      // Null reads as the default style; rows fill in on their next sync.
+      await _addColumnIfMissing(db, 'cover_style', 'TEXT');
+    }
+  }
+
+  Future<void> _addColumnIfMissing(
+      Database db, String column, String definition) async {
+    final cols = await db.rawQuery('PRAGMA table_info(notebooks)');
+    if (cols.any((c) => c['name'] == column)) return;
+    await db.execute('ALTER TABLE notebooks ADD COLUMN $column $definition');
   }
 
   // ── Local File I/O ──
@@ -619,13 +632,14 @@ class FileService {
     String syncStatus = 'synced',
     int? fileSize,
     int? coverColor,
+    String? coverStyle,
     String? paperType,
     int pageCount = 0,
     DateTime? createdAt,
   }) async {
     final existing = await _db.query(
       'notebooks',
-      columns: ['local_only', 'download_skipped'],
+      columns: ['local_only', 'download_skipped', 'cover_style'],
       where: 'id = ?',
       whereArgs: [id],
       limit: 1,
@@ -645,6 +659,8 @@ class FileService {
         'sync_status': syncStatus,
         'file_size': fileSize,
         'cover_color': coverColor,
+        // Callers without the metadata at hand pass null: keep the stored one.
+        'cover_style': coverStyle ?? flags['cover_style'],
         'paper_type': paperType,
         'page_count': pageCount,
         'created_at': (createdAt ?? localModifiedAt).toIso8601String(),
@@ -661,6 +677,7 @@ class FileService {
     required String title,
     required DateTime localModifiedAt,
     required int? coverColor,
+    String? coverStyle,
     required String? paperType,
     required int pageCount,
     DateTime? createdAt,
@@ -671,6 +688,7 @@ class FileService {
         'title': title,
         'local_modified_at': localModifiedAt.toIso8601String(),
         'cover_color': coverColor,
+        if (coverStyle != null) 'cover_style': coverStyle,
         'paper_type': paperType,
         'page_count': pageCount,
         if (createdAt != null) 'created_at': createdAt.toIso8601String(),
@@ -946,6 +964,17 @@ class FileService {
   }
 
   /// Clears all dirty pages for a notebook (after successful sync).
+  /// Clears only [keys]: ones recorded meanwhile stay pending.
+  Future<void> clearDirtyPagesOf(String notebookId, Set<String> keys) async {
+    for (final k in keys) {
+      await _db.delete(
+        'dirty_pages',
+        where: 'notebook_id = ? AND page_id = ?',
+        whereArgs: [notebookId, k],
+      );
+    }
+  }
+
   Future<void> clearDirtyPages(String notebookId) async {
     await _db.delete(
       'dirty_pages',
@@ -1106,6 +1135,7 @@ class FileService {
         syncStatus: 'modified', // needs re-upload; remote copy was deleted
         fileSize: meta['file_size'] as int?,
         coverColor: meta['cover_color'] as int?,
+        coverStyle: meta['cover_style'] as String?,
         paperType: meta['paper_type'] as String?,
         pageCount: meta['page_count'] as int? ?? 0,
         createdAt: DateTime.tryParse(meta['created_at'] as String? ?? '') ?? DateTime.now(),

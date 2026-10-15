@@ -288,6 +288,7 @@ class NotebookListNotifier
         createdAt: DateTime.tryParse(row['created_at'] as String? ?? '') ?? DateTime.now(),
         modifiedAt: DateTime.tryParse(row['local_modified_at'] as String? ?? '') ?? DateTime.now(),
         coverColor: row['cover_color'] as int? ?? 0xFF1565C0,
+        coverStyle: row['cover_style'] as String? ?? 'default',
         paperType: row['paper_type'] as String? ?? 'lined',
         pageCount: row['page_count'] as int? ?? 0,
       ),
@@ -430,6 +431,7 @@ class NotebookListNotifier
                     title: parsed.metadata.title,
                     localModifiedAt: parsed.metadata.modifiedAt,
                     coverColor: parsed.metadata.coverColor,
+                    coverStyle: parsed.metadata.coverStyle,
                     paperType: parsed.metadata.paperType,
                     pageCount: parsed.metadata.pageCount,
                     createdAt: parsed.metadata.createdAt,
@@ -538,6 +540,7 @@ class NotebookListNotifier
             title: deltaMeta.title,
             localModifiedAt: deltaMeta.modifiedAt,
             coverColor: deltaMeta.coverColor,
+            coverStyle: deltaMeta.coverStyle,
             paperType: deltaMeta.paperType,
             pageCount: deltaMeta.pageCount,
             createdAt: deltaMeta.createdAt,
@@ -722,6 +725,7 @@ class NotebookListNotifier
                   syncStatus: (existing?['sync_status'] as String?) ?? 'synced',
                   fileSize: existing?['file_size'] as int?,
                   coverColor: deltaMeta.coverColor,
+                  coverStyle: deltaMeta.coverStyle,
                   paperType: deltaMeta.paperType,
                   pageCount: deltaMeta.pageCount,
                   createdAt: deltaMeta.createdAt,
@@ -840,6 +844,7 @@ class NotebookListNotifier
                       fullData.length
                   : fullData.length,
           coverColor: libraryMeta.coverColor,
+          coverStyle: libraryMeta.coverStyle,
           paperType: libraryMeta.paperType,
           pageCount: libraryMeta.pageCount,
           createdAt: libraryMeta.createdAt,
@@ -1321,6 +1326,7 @@ class NotebookListNotifier
       localModifiedAt: updatedMeta.modifiedAt,
       syncStatus: 'modified',
       coverColor: updatedMeta.coverColor,
+      coverStyle: updatedMeta.coverStyle,
       paperType: updatedMeta.paperType,
       pageCount: updatedMeta.pageCount,
       createdAt: updatedMeta.createdAt,
@@ -1362,7 +1368,7 @@ class NotebookListNotifier
   /// rebuild the local .ncnote with the new metadata, persist, mark
   /// dirty, and best-effort push to the server.
   Future<void> updateNotebookCover(
-      NotebookEntry entry, int newCoverColor) async {
+      NotebookEntry entry, int newCoverColor, String newCoverStyle) async {
     final syncService = _ref.read(syncServiceProvider);
     final webdav = _ref.read(remoteStoreProvider);
     final fileService = _ref.read(fileServiceProvider);
@@ -1379,6 +1385,7 @@ class NotebookListNotifier
 
     final updatedMeta = result.metadata.copyWith(
       coverColor: newCoverColor,
+      coverStyle: newCoverStyle,
       modifiedAt: DateTime.now(),
     );
 
@@ -1397,6 +1404,7 @@ class NotebookListNotifier
       localModifiedAt: updatedMeta.modifiedAt,
       syncStatus: 'modified',
       coverColor: updatedMeta.coverColor,
+      coverStyle: updatedMeta.coverStyle,
       paperType: updatedMeta.paperType,
       pageCount: updatedMeta.pageCount,
       createdAt: updatedMeta.createdAt,
@@ -1415,7 +1423,9 @@ class NotebookListNotifier
         );
         await _patchDeltaMetadata(syncService, updatedMeta.id,
             (m) => m.copyWith(
-              coverColor: newCoverColor, modifiedAt: updatedMeta.modifiedAt));
+              coverColor: newCoverColor,
+              coverStyle: newCoverStyle,
+              modifiedAt: updatedMeta.modifiedAt));
         await fileService.markNotebookSynced(updatedMeta.id, etag);
         remoteDone = true;
       }
@@ -1480,6 +1490,7 @@ class NotebookListNotifier
       localModifiedAt: updatedMeta.modifiedAt,
       syncStatus: 'modified',
       coverColor: updatedMeta.coverColor,
+      coverStyle: updatedMeta.coverStyle,
       paperType: updatedMeta.paperType,
       pageCount: updatedMeta.pageCount,
       createdAt: updatedMeta.createdAt,
@@ -1641,6 +1652,7 @@ class NotebookListNotifier
           (r) => r.copyWith(
               title: m.title,
               coverColor: m.coverColor,
+              coverStyle: m.coverStyle,
               tags: m.tags,
               modifiedAt: m.modifiedAt));
       await fileService.clearDirtyPages(id);
@@ -1926,6 +1938,7 @@ class NotebookListNotifier
       }
 
       try {
+        final pushedKeys = await fileService.dirtyPagesOf(id);
         final localData = await fileService.readNotebookFile(id);
         if (localData == null) continue;
         final result = syncService.parseNcnoteMetadata(localData);
@@ -1945,6 +1958,8 @@ class NotebookListNotifier
           dirtyAssets: allAssets.isNotEmpty ? allAssets : null,
           symbolLibraries: symbolLibraries.isNotEmpty ? symbolLibraries : null,
         );
+        // Every page and the metadata read above just went up.
+        await fileService.clearDirtyPagesOf(id, pushedKeys);
         await fileService.markNotebookSynced(id, res.metaEtag);
         // The root file is what other devices list; without it the folder
         // just written is invisible to them.

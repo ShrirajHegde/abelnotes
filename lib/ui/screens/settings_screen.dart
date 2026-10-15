@@ -1348,6 +1348,7 @@ class _AdvancedSection extends ConsumerWidget {
         syncStatus: 'synced',
         fileSize: bytes.length,
         coverColor: result.metadata.coverColor,
+        coverStyle: result.metadata.coverStyle,
         paperType: result.metadata.paperType,
         pageCount: result.metadata.pageCount,
         createdAt: result.metadata.createdAt,

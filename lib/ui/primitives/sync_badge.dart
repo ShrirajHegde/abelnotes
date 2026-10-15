@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:abelnotes/l10n/app_localizations.dart';
 import '../theme/hw_theme.dart';
@@ -47,6 +49,7 @@ class NotebookCover extends StatelessWidget {
   final String title;
   final bool favorite;
   final BackgroundTexture texture;
+  final CoverStyle style;
   final double width;
   final double height;
   final VoidCallback? onTap;
@@ -57,6 +60,7 @@ class NotebookCover extends StatelessWidget {
     required this.title,
     this.favorite = false,
     this.texture = BackgroundTexture.lines,
+    this.style = CoverStyle.auto,
     this.width = 200,
     this.height = 260,
     this.onTap,
@@ -71,6 +75,8 @@ class NotebookCover extends StatelessWidget {
       topRight: Radius.circular(12),
       bottomRight: Radius.circular(12),
     );
+    // Fixed insets suit library-sized cards; picker swatches scale them.
+    final small = height < 120;
     return SizedBox(
       width: width,
       height: height,
@@ -130,18 +136,33 @@ class NotebookCover extends StatelessWidget {
                 ),
               ),
               // Texture overlay (subtle white pattern)
-              Positioned(
-                left: 28,
-                right: 18,
-                top: 40,
-                bottom: 50,
-                child: Opacity(
-                  opacity: 0.35,
-                  child: CustomPaint(
-                    painter: _TexturePainter(texture: texture),
+              if (style == CoverStyle.auto)
+                Positioned(
+                  left: small ? width * 0.14 : 28,
+                  right: small ? width * 0.09 : 18,
+                  top: small ? height * 0.15 : 40,
+                  bottom: small ? height * 0.19 : 50,
+                  child: Opacity(
+                    opacity: 0.35,
+                    child: CustomPaint(
+                      painter: _TexturePainter(texture: texture),
+                    ),
+                  ),
+                )
+              else
+                Positioned(
+                  left: 13,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      topRight: radius.topRight,
+                      bottomRight: radius.bottomRight,
+                    ),
+                    child: CustomPaint(painter: CoverPatternPainter(style)),
                   ),
                 ),
-              ),
               // Bottom darkening scrim behind the title — pushes the
               // white-text contrast up on the lighter cover swatches
               // (mustard, sage, dusty rose) to clear WCAG AA. The single
@@ -151,7 +172,7 @@ class NotebookCover extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: 80,
+                height: small ? height * 0.3 : 80,
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -207,6 +228,127 @@ class NotebookCover extends StatelessWidget {
 
 enum BackgroundTexture { lines, grid, dots, blank, cornell }
 
+/// Cover pattern stored in `NotebookMetadata.coverStyle`. [auto] keeps the
+/// paper-type hint; keys from a newer version read as [auto].
+enum CoverStyle {
+  auto('default'),
+  plain('plain'),
+  pinstripe('pinstripe'),
+  diagonal('diagonal'),
+  polka('polka'),
+  gingham('gingham'),
+  waves('waves'),
+  label('label'),
+  twoTone('two_tone'),
+  sheen('sheen');
+
+  final String key;
+  const CoverStyle(this.key);
+
+  static CoverStyle fromKey(String? key) =>
+      values.firstWhere((s) => s.key == key, orElse: () => auto);
+}
+
+/// Paints a [CoverStyle] over the whole cover; sizes are in logical pixels
+/// so the pattern keeps its scale on small list swatches.
+class CoverPatternPainter extends CustomPainter {
+  final CoverStyle style;
+  const CoverPatternPainter(this.style);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final line = Paint()
+      ..color = const Color(0x2EFFFFFF)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    switch (style) {
+      case CoverStyle.auto:
+      case CoverStyle.plain:
+        break;
+      case CoverStyle.pinstripe:
+        for (var x = 6.0; x < w; x += 8) {
+          canvas.drawLine(Offset(x, 0), Offset(x, h), line);
+        }
+        break;
+      case CoverStyle.diagonal:
+        final band = Paint()
+          ..color = const Color(0x1FFFFFFF)
+          ..strokeWidth = 5;
+        for (var d = -h; d < w; d += 14) {
+          canvas.drawLine(Offset(d, h), Offset(d + h, 0), band);
+        }
+        break;
+      case CoverStyle.polka:
+        final dot = Paint()..color = const Color(0x38FFFFFF);
+        var row = 0;
+        for (var y = 8.0; y < h; y += 12, row++) {
+          for (var x = row.isEven ? 8.0 : 14.0; x < w; x += 12) {
+            canvas.drawCircle(Offset(x, y), 2.2, dot);
+          }
+        }
+        break;
+      case CoverStyle.gingham:
+        final band = Paint()..color = const Color(0x1AFFFFFF);
+        for (var x = 0.0; x < w; x += 16) {
+          canvas.drawRect(Rect.fromLTWH(x, 0, 8, h), band);
+        }
+        for (var y = 0.0; y < h; y += 16) {
+          canvas.drawRect(Rect.fromLTWH(0, y, w, 8), band);
+        }
+        break;
+      case CoverStyle.waves:
+        final wave = Paint()
+          ..color = const Color(0x33FFFFFF)
+          ..strokeWidth = 1.2
+          ..style = PaintingStyle.stroke;
+        for (var y = 10.0; y < h; y += 12) {
+          final path = Path()..moveTo(0, y);
+          for (var x = 0.0; x < w; x += 12) {
+            path.quadraticBezierTo(x + 3, y - 3, x + 6, y);
+            path.quadraticBezierTo(x + 9, y + 3, x + 12, y);
+          }
+          canvas.drawPath(path, wave);
+        }
+        break;
+      case CoverStyle.label:
+        final rect = Rect.fromLTWH(w * 0.14, h * 0.18, w * 0.72, h * 0.2);
+        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+            Paint()..color = const Color(0xD9FFFFFF));
+        final ink = Paint()
+          ..color = const Color(0x33000000)
+          ..strokeWidth = 1;
+        for (var i = 1; i <= 2; i++) {
+          final y = rect.top + rect.height * i / 3;
+          canvas.drawLine(Offset(rect.left + 8, y), Offset(rect.right - 8, y), ink);
+        }
+        break;
+      case CoverStyle.twoTone:
+        canvas.drawRect(Rect.fromLTWH(0, h * 0.62, w, h * 0.38),
+            Paint()..color = const Color(0x2E000000));
+        canvas.drawLine(Offset(0, h * 0.62), Offset(w, h * 0.62),
+            Paint()
+              ..color = const Color(0x40FFFFFF)
+              ..strokeWidth = 1);
+        break;
+      case CoverStyle.sheen:
+        canvas.drawRect(
+          Offset.zero & size,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0x33FFFFFF), Color(0x00FFFFFF), Color(0x26000000)],
+            ).createShader(Offset.zero & size),
+        );
+        break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(CoverPatternPainter old) => old.style != style;
+}
+
 class _TexturePainter extends CustomPainter {
   final BackgroundTexture texture;
   _TexturePainter({required this.texture});
@@ -218,32 +360,35 @@ class _TexturePainter extends CustomPainter {
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
     final w = size.width, h = size.height;
+    // Swatch-sized areas only; library cards keep the original 20px margin.
+    final short = math.min(w, h);
+    final m = short < 100 ? short * 0.12 : 20.0;
     switch (texture) {
       case BackgroundTexture.lines:
-        for (var y = 20.0; y <= h - 20; y += (h - 40) / 5) {
+        for (var y = m; y <= h - m; y += (h - 2 * m) / 5) {
           canvas.drawLine(Offset(0, y), Offset(w, y), paint);
         }
         break;
       case BackgroundTexture.grid:
-        for (var y = 20.0; y <= h - 20; y += (h - 40) / 5) {
+        for (var y = m; y <= h - m; y += (h - 2 * m) / 5) {
           canvas.drawLine(Offset(0, y), Offset(w, y), paint);
         }
-        for (var x = 20.0; x <= w - 20; x += (w - 40) / 4) {
+        for (var x = m; x <= w - m; x += (w - 2 * m) / 4) {
           canvas.drawLine(Offset(x, 0), Offset(x, h), paint);
         }
         break;
       case BackgroundTexture.dots:
         final dot = Paint()..color = Colors.white;
-        for (var y = 20.0; y <= h - 20; y += (h - 40) / 5) {
-          for (var x = 20.0; x <= w - 20; x += (w - 40) / 4) {
+        for (var y = m; y <= h - m; y += (h - 2 * m) / 5) {
+          for (var x = m; x <= w - m; x += (w - 2 * m) / 4) {
             canvas.drawCircle(Offset(x, y), 1.2, dot);
           }
         }
         break;
       case BackgroundTexture.cornell:
-        canvas.drawLine(Offset(w * 0.3, 0), Offset(w * 0.3, h - 20), paint);
+        canvas.drawLine(Offset(w * 0.3, 0), Offset(w * 0.3, h - m), paint);
         canvas.drawLine(
-            Offset(0, h - 20), Offset(w, h - 20), paint);
+            Offset(0, h - m), Offset(w, h - m), paint);
         break;
       case BackgroundTexture.blank:
         break;

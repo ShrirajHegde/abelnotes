@@ -826,6 +826,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libChangeCover => 'Change cover';
 
   @override
+  String get libCoverColor => 'Color';
+
+  @override
+  String get libCoverPattern => 'Pattern';
+
+  @override
+  String get libCoverApply => 'Apply';
+
+  @override
+  String get libCoverStyleAuto => 'Automatic (from paper type)';
+
+  @override
+  String get libCoverStylePlain => 'Solid';
+
+  @override
+  String get libCoverStylePinstripe => 'Pinstripe';
+
+  @override
+  String get libCoverStyleDiagonal => 'Diagonal stripes';
+
+  @override
+  String get libCoverStylePolka => 'Polka dots';
+
+  @override
+  String get libCoverStyleGingham => 'Gingham';
+
+  @override
+  String get libCoverStyleWaves => 'Waves';
+
+  @override
+  String get libCoverStyleLabel => 'Label';
+
+  @override
+  String get libCoverStyleTwoTone => 'Two-tone';
+
+  @override
+  String get libCoverStyleSheen => 'Sheen';
+
+  @override
   String get libMoveToFolder => 'Move to folder';
 
   @override

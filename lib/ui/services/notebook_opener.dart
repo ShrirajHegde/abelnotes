@@ -221,6 +221,7 @@ Future<void> _openNotebookAndNavigate(
         syncStatus: 'synced',
         fileSize: bytes.length,
         coverColor: result.metadata.coverColor,
+        coverStyle: result.metadata.coverStyle,
         paperType: result.metadata.paperType,
         pageCount: result.metadata.pageCount,
         createdAt: result.metadata.createdAt,

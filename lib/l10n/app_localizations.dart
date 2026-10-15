@@ -1410,6 +1410,84 @@ abstract class AppLocalizations {
   /// **'Cambia copertina'**
   String get libChangeCover;
 
+  /// No description provided for @libCoverColor.
+  ///
+  /// In it, this message translates to:
+  /// **'Colore'**
+  String get libCoverColor;
+
+  /// No description provided for @libCoverPattern.
+  ///
+  /// In it, this message translates to:
+  /// **'Motivo'**
+  String get libCoverPattern;
+
+  /// No description provided for @libCoverApply.
+  ///
+  /// In it, this message translates to:
+  /// **'Applica'**
+  String get libCoverApply;
+
+  /// No description provided for @libCoverStyleAuto.
+  ///
+  /// In it, this message translates to:
+  /// **'Automatico (dal tipo di carta)'**
+  String get libCoverStyleAuto;
+
+  /// No description provided for @libCoverStylePlain.
+  ///
+  /// In it, this message translates to:
+  /// **'Tinta unita'**
+  String get libCoverStylePlain;
+
+  /// No description provided for @libCoverStylePinstripe.
+  ///
+  /// In it, this message translates to:
+  /// **'Gessato'**
+  String get libCoverStylePinstripe;
+
+  /// No description provided for @libCoverStyleDiagonal.
+  ///
+  /// In it, this message translates to:
+  /// **'Righe diagonali'**
+  String get libCoverStyleDiagonal;
+
+  /// No description provided for @libCoverStylePolka.
+  ///
+  /// In it, this message translates to:
+  /// **'Pois'**
+  String get libCoverStylePolka;
+
+  /// No description provided for @libCoverStyleGingham.
+  ///
+  /// In it, this message translates to:
+  /// **'Quadretti vichy'**
+  String get libCoverStyleGingham;
+
+  /// No description provided for @libCoverStyleWaves.
+  ///
+  /// In it, this message translates to:
+  /// **'Onde'**
+  String get libCoverStyleWaves;
+
+  /// No description provided for @libCoverStyleLabel.
+  ///
+  /// In it, this message translates to:
+  /// **'Etichetta'**
+  String get libCoverStyleLabel;
+
+  /// No description provided for @libCoverStyleTwoTone.
+  ///
+  /// In it, this message translates to:
+  /// **'Bicolore'**
+  String get libCoverStyleTwoTone;
+
+  /// No description provided for @libCoverStyleSheen.
+  ///
+  /// In it, this message translates to:
+  /// **'Lucido'**
+  String get libCoverStyleSheen;
+
   /// No description provided for @libMoveToFolder.
   ///
   /// In it, this message translates to:

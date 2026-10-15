@@ -829,6 +829,45 @@ class AppLocalizationsIt extends AppLocalizations {
   String get libChangeCover => 'Cambia copertina';
 
   @override
+  String get libCoverColor => 'Colore';
+
+  @override
+  String get libCoverPattern => 'Motivo';
+
+  @override
+  String get libCoverApply => 'Applica';
+
+  @override
+  String get libCoverStyleAuto => 'Automatico (dal tipo di carta)';
+
+  @override
+  String get libCoverStylePlain => 'Tinta unita';
+
+  @override
+  String get libCoverStylePinstripe => 'Gessato';
+
+  @override
+  String get libCoverStyleDiagonal => 'Righe diagonali';
+
+  @override
+  String get libCoverStylePolka => 'Pois';
+
+  @override
+  String get libCoverStyleGingham => 'Quadretti vichy';
+
+  @override
+  String get libCoverStyleWaves => 'Onde';
+
+  @override
+  String get libCoverStyleLabel => 'Etichetta';
+
+  @override
+  String get libCoverStyleTwoTone => 'Bicolore';
+
+  @override
+  String get libCoverStyleSheen => 'Lucido';
+
+  @override
   String get libMoveToFolder => 'Sposta in cartella';
 
   @override

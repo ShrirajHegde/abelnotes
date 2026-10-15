@@ -815,6 +815,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libChangeCover => '更换封面';
 
   @override
+  String get libCoverColor => '颜色';
+
+  @override
+  String get libCoverPattern => '图案';
+
+  @override
+  String get libCoverApply => '应用';
+
+  @override
+  String get libCoverStyleAuto => '自动（按纸张类型）';
+
+  @override
+  String get libCoverStylePlain => '纯色';
+
+  @override
+  String get libCoverStylePinstripe => '细条纹';
+
+  @override
+  String get libCoverStyleDiagonal => '斜条纹';
+
+  @override
+  String get libCoverStylePolka => '波点';
+
+  @override
+  String get libCoverStyleGingham => '格纹';
+
+  @override
+  String get libCoverStyleWaves => '波浪';
+
+  @override
+  String get libCoverStyleLabel => '标签';
+
+  @override
+  String get libCoverStyleTwoTone => '双色';
+
+  @override
+  String get libCoverStyleSheen => '光泽';
+
+  @override
   String get libMoveToFolder => '移动到文件夹';
 
   @override
