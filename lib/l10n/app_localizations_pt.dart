@@ -1179,6 +1179,13 @@ class AppLocalizationsPt extends AppLocalizations {
       'Compensa interrupções breves do sensor (ex.: o ponto do i)';
 
   @override
+  String get setFillShapes => 'Preencher formas';
+
+  @override
+  String get setFillShapesSub =>
+      'Círculos, retângulos e triângulos reconhecidos recebem um tom suave da cor da tinta';
+
+  @override
   String get setSyncConnectedDesc =>
       'Conectado a um servidor WebDAV. Os cadernos sincronizam em todos os seus dispositivos.';
 

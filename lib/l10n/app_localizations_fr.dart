@@ -1183,6 +1183,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Compense de brèves interruptions du capteur (par ex. le point du i)';
 
   @override
+  String get setFillShapes => 'Remplir les formes';
+
+  @override
+  String get setFillShapesSub =>
+      'Les cercles, rectangles et triangles reconnus prennent une teinte légère de la couleur de l\'encre';
+
+  @override
   String get setSyncConnectedDesc =>
       'Connecté à un serveur WebDAV. Les carnets se synchronisent sur tous vos appareils.';
 

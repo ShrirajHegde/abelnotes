@@ -1992,6 +1992,18 @@ abstract class AppLocalizations {
   /// **'Compensa brevi interruzioni del sensore (es. punto della i)'**
   String get setStrokeContinuationSub;
 
+  /// No description provided for @setFillShapes.
+  ///
+  /// In it, this message translates to:
+  /// **'Riempi le forme'**
+  String get setFillShapes;
+
+  /// No description provided for @setFillShapesSub.
+  ///
+  /// In it, this message translates to:
+  /// **'Cerchi, rettangoli e triangoli riconosciuti prendono una tinta leggera del colore dell\'inchiostro'**
+  String get setFillShapesSub;
+
   /// No description provided for @setSyncConnectedDesc.
   ///
   /// In it, this message translates to:

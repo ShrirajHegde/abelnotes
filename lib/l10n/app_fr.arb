@@ -314,6 +314,8 @@
   "setPressureThicknessSub": "Modulation du trait selon la pression du stylet",
   "setStrokeContinuation": "Continuité du trait",
   "setStrokeContinuationSub": "Compense de brèves interruptions du capteur (par ex. le point du i)",
+  "setFillShapes": "Remplir les formes",
+  "setFillShapesSub": "Les cercles, rectangles et triangles reconnus prennent une teinte légère de la couleur de l'encre",
   "setSyncConnectedDesc": "Connecté à un serveur WebDAV. Les carnets se synchronisent sur tous vos appareils.",
   "setSyncLocalOnlyDesc": "Mode local uniquement : les carnets restent sur cet appareil. Connectez un serveur WebDAV pour y accéder depuis plusieurs appareils.",
   "setSyncWebdav": "WebDAV",

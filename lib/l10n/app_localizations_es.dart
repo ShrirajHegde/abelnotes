@@ -1181,6 +1181,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Compensa breves interrupciones del sensor (p. ej., el punto de la i)';
 
   @override
+  String get setFillShapes => 'Rellenar formas';
+
+  @override
+  String get setFillShapesSub =>
+      'Los círculos, rectángulos y triángulos reconocidos reciben un tono suave del color de la tinta';
+
+  @override
   String get setSyncConnectedDesc =>
       'Conectado a un servidor WebDAV. Los cuadernos se sincronizan en todos tus dispositivos.';
 

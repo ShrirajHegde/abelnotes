@@ -1181,6 +1181,13 @@ class AppLocalizationsIt extends AppLocalizations {
       'Compensa brevi interruzioni del sensore (es. punto della i)';
 
   @override
+  String get setFillShapes => 'Riempi le forme';
+
+  @override
+  String get setFillShapesSub =>
+      'Cerchi, rettangoli e triangoli riconosciuti prendono una tinta leggera del colore dell\'inchiostro';
+
+  @override
   String get setSyncConnectedDesc =>
       'Connesso a un server WebDAV. I taccuini si sincronizzano su tutti i tuoi dispositivi.';
 

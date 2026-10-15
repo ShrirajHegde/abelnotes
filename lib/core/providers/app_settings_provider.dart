@@ -141,6 +141,9 @@ class AppSettings {
   /// starting a new one (sensor dropouts on iPad).
   final bool strokeContinuation;
 
+  /// Recognized closed shapes get a light tint of the ink colour.
+  final bool fillRecognizedShapes;
+
   /// Which remote the notebooks sync to: 'webdav' for the user's own
   /// server, 'drive' for their Google Drive, null for local-only. One
   /// backend at a time — a notebook living in two places at once would give
@@ -182,6 +185,7 @@ class AppSettings {
     this.stylusOnlyDrawing,
     this.pressureWidth = true,
     this.strokeContinuation = true,
+    this.fillRecognizedShapes = true,
     this.lastTool,
     this.syncBackend,
     this.showPageStrip = true,
@@ -210,6 +214,7 @@ class AppSettings {
     bool? stylusOnlyDrawing,
     bool? pressureWidth,
     bool? strokeContinuation,
+    bool? fillRecognizedShapes,
     String? lastTool,
     String? syncBackend,
     /// copyWith can't tell "leave it" from "set it to null", and going back
@@ -234,6 +239,7 @@ class AppSettings {
         stylusOnlyDrawing: stylusOnlyDrawing ?? this.stylusOnlyDrawing,
         pressureWidth: pressureWidth ?? this.pressureWidth,
         strokeContinuation: strokeContinuation ?? this.strokeContinuation,
+        fillRecognizedShapes: fillRecognizedShapes ?? this.fillRecognizedShapes,
         lastTool: lastTool ?? this.lastTool,
         syncBackend:
             clearSyncBackend ? null : (syncBackend ?? this.syncBackend),
@@ -314,6 +320,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
         stylusOnlyDrawing: map['stylus_only_drawing'] as bool?,
         pressureWidth: map['pressure_width'] as bool? ?? true,
         strokeContinuation: map['stroke_continuation'] as bool? ?? true,
+        fillRecognizedShapes: map['fill_shapes'] as bool? ?? true,
         lastTool: map['last_tool'] as String?,
         syncBackend: map['sync_backend'] as String?,
         showPageStrip: map['show_page_strip'] as bool? ?? true,
@@ -343,6 +350,7 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
           'stylus_only_drawing': state.stylusOnlyDrawing,
         'pressure_width': state.pressureWidth,
         'stroke_continuation': state.strokeContinuation,
+        'fill_shapes': state.fillRecognizedShapes,
         if (state.lastTool != null) 'last_tool': state.lastTool,
         if (state.syncBackend != null) 'sync_backend': state.syncBackend,
         'show_page_strip': state.showPageStrip,
@@ -430,6 +438,11 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
 
   void setStrokeContinuation(bool v) {
     state = state.copyWith(strokeContinuation: v);
+    _persist();
+  }
+
+  void setFillRecognizedShapes(bool v) {
+    state = state.copyWith(fillRecognizedShapes: v);
     _persist();
   }
 

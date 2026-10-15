@@ -1182,6 +1182,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gleicht kurze Aussetzer des Sensors aus (z. B. beim i-Punkt)';
 
   @override
+  String get setFillShapes => 'Formen füllen';
+
+  @override
+  String get setFillShapesSub =>
+      'Erkannte Kreise, Rechtecke und Dreiecke erhalten einen leichten Farbton der Tinte';
+
+  @override
   String get setSyncConnectedDesc =>
       'Mit einem WebDAV-Server verbunden. Notizbücher werden auf allen deinen Geräten synchronisiert.';
 

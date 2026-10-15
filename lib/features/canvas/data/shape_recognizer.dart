@@ -30,6 +30,7 @@ ShapeData? recognizeShape(
   required int color,
   required double strokeWidth,
   bool isHighlighter = false,
+  bool fill = false,
 }) {
   if (points.length < 5) return null;
   final pts = _dedupe(points);
@@ -59,6 +60,10 @@ ShapeData? recognizeShape(
         strokeColor: color,
         strokeWidth: strokeWidth,
         isHighlighter: isHighlighter,
+        // Closed shapes get a ~19% tint of the ink when [fill] is on.
+        fillColor: fill && type != 'line'
+            ? (color & 0x00FFFFFF) | (0x30 << 24)
+            : null,
       );
 
   final len = _pathLen(pts);

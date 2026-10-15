@@ -3122,10 +3122,24 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         _heldShapeGrip ?? Offset(s.x2, s.y2),
         position,
       );
+      // Oblique triangles draw from absolute vertices: scale them with the box.
+      final from = Rect.fromPoints(
+          Offset(base.x1, base.y1), Offset(base.x2, base.y2));
+      final vertices = _transformVertices(
+          base.vertices,
+          (p) => Offset(
+                from.width <= 0
+                    ? box.left
+                    : box.left + (p.dx - from.left) / from.width * box.width,
+                from.height <= 0
+                    ? box.top
+                    : box.top + (p.dy - from.top) / from.height * box.height,
+              ));
       state = state!.copyWith(
         recognizedShape: s.copyWith(
           x1: box.left, y1: box.top,
           x2: box.right, y2: box.bottom,
+          vertices: vertices,
         ),
       );
       return;
@@ -3220,6 +3234,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         color: state!.toolSettings.color,
         strokeWidth: state!.toolSettings.strokeWidth,
         isHighlighter: state!.currentTool == CanvasTool.highlighter,
+        fill: _ref.read(appSettingsProvider).fillRecognizedShapes,
       );
 
   void _addShapeElement(ShapeData shapeData) {

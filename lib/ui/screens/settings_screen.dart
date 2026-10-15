@@ -594,6 +594,8 @@ class _InputSection extends ConsumerWidget {
         ref.watch(appSettingsProvider.select((s) => s.pressureWidth));
     final continuation =
         ref.watch(appSettingsProvider.select((s) => s.strokeContinuation));
+    final fillShapes =
+        ref.watch(appSettingsProvider.select((s) => s.fillRecognizedShapes));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -622,6 +624,14 @@ class _InputSection extends ConsumerWidget {
                 onChanged: (v) => ref
                     .read(appSettingsProvider.notifier)
                     .setStrokeContinuation(v))),
+        _Row(
+            title: l10n.setFillShapes,
+            sub: l10n.setFillShapesSub,
+            control: HwSwitch(
+                value: fillShapes,
+                onChanged: (v) => ref
+                    .read(appSettingsProvider.notifier)
+                    .setFillRecognizedShapes(v))),
       ],
     );
   }

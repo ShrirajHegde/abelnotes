@@ -1178,6 +1178,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Compensates for brief sensor interruptions (e.g. the dot of an i)';
 
   @override
+  String get setFillShapes => 'Fill shapes';
+
+  @override
+  String get setFillShapesSub =>
+      'Recognized circles, rectangles and triangles get a light tint of the ink color';
+
+  @override
   String get setSyncConnectedDesc =>
       'Connected to a WebDAV server. Notebooks sync across all your devices.';
 

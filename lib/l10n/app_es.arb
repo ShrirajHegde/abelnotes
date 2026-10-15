@@ -314,6 +314,8 @@
   "setPressureThicknessSub": "Modulación del trazo según la presión del stylus",
   "setStrokeContinuation": "Continuación del trazo",
   "setStrokeContinuationSub": "Compensa breves interrupciones del sensor (p. ej., el punto de la i)",
+  "setFillShapes": "Rellenar formas",
+  "setFillShapesSub": "Los círculos, rectángulos y triángulos reconocidos reciben un tono suave del color de la tinta",
   "setSyncConnectedDesc": "Conectado a un servidor WebDAV. Los cuadernos se sincronizan en todos tus dispositivos.",
   "setSyncLocalOnlyDesc": "Modo solo local: los cuadernos permanecen en este dispositivo. Conecta un servidor WebDAV para acceder a ellos desde varios dispositivos.",
   "setSyncWebdav": "WebDAV",

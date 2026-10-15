@@ -1160,6 +1160,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setStrokeContinuationSub => '弥补传感器的短暂中断（例如写 i 上面那一点）';
 
   @override
+  String get setFillShapes => '填充形状';
+
+  @override
+  String get setFillShapesSub => '识别出的圆形、矩形和三角形会以墨水颜色的浅色填充';
+
+  @override
   String get setSyncConnectedDesc => '已连接到 WebDAV 服务器。笔记本会在你的所有设备之间同步。';
 
   @override
