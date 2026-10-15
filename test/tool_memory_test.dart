@@ -47,4 +47,33 @@ void main() {
     c.read(appSettingsProvider.notifier).setStylusOnlyDrawing(true);
     expect(c.read(appSettingsProvider).stylusOnlyDrawing, isTrue);
   });
+
+  test('pressure width and stroke continuation are on until switched off',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    expect(c.read(appSettingsProvider).pressureWidth, isTrue);
+    expect(c.read(appSettingsProvider).strokeContinuation, isTrue);
+
+    c.read(appSettingsProvider.notifier)
+      ..setPressureWidth(false)
+      ..setStrokeContinuation(false);
+    await Future<void>.delayed(Duration.zero);
+    final prefs = await SharedPreferences.getInstance();
+    final stored =
+        jsonDecode(prefs.getString('app_settings_v1')!) as Map<String, dynamic>;
+    expect(stored['pressure_width'], isFalse);
+    expect(stored['stroke_continuation'], isFalse);
+
+    final restarted = ProviderContainer();
+    addTearDown(restarted.dispose);
+    restarted.read(appSettingsProvider);
+    for (var i = 0; i < 10; i++) {
+      await Future<void>.delayed(Duration.zero);
+      if (!restarted.read(appSettingsProvider).pressureWidth) break;
+    }
+    expect(restarted.read(appSettingsProvider).pressureWidth, isFalse);
+    expect(restarted.read(appSettingsProvider).strokeContinuation, isFalse);
+  });
 }

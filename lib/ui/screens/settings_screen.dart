@@ -590,6 +590,10 @@ class _InputSection extends ConsumerWidget {
     // editor's pan tool is the "don't draw" state. This switch is the
     // palm-rejection opt-in for people who write with a stylus.
     final stylusOnly = override ?? false;
+    final pressure =
+        ref.watch(appSettingsProvider.select((s) => s.pressureWidth));
+    final continuation =
+        ref.watch(appSettingsProvider.select((s) => s.strokeContinuation));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -603,21 +607,21 @@ class _InputSection extends ConsumerWidget {
                     .read(appSettingsProvider.notifier)
                     .setStylusOnlyDrawing(v))),
         _Row(
-            title: l10n.setPalmRejection,
-            sub: l10n.setPalmRejectionSub,
-            control: HwSwitch(value: true, onChanged: (_) {})),
-        _Row(
             title: l10n.setPressureThickness,
             sub: l10n.setPressureThicknessSub,
-            control: HwSwitch(value: true, onChanged: (_) {})),
-        _Row(
-            title: l10n.setTiltCalligraphy,
-            sub: l10n.setTiltCalligraphySub,
-            control: HwSwitch(value: true, onChanged: (_) {})),
+            control: HwSwitch(
+                value: pressure,
+                onChanged: (v) => ref
+                    .read(appSettingsProvider.notifier)
+                    .setPressureWidth(v))),
         _Row(
             title: l10n.setStrokeContinuation,
             sub: l10n.setStrokeContinuationSub,
-            control: HwSwitch(value: true, onChanged: (_) {})),
+            control: HwSwitch(
+                value: continuation,
+                onChanged: (v) => ref
+                    .read(appSettingsProvider.notifier)
+                    .setStrokeContinuation(v))),
       ],
     );
   }

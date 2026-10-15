@@ -975,6 +975,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libInfiniteSpace => 'infinite space';
 
   @override
+  String get libShowAll => 'Show all';
+
+  @override
+  String get libShowLess => 'Show less';
+
+  @override
   String get libNewSketch => 'New sketch';
 
   @override
@@ -1158,24 +1164,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Ignores finger touch while writing. Pinch and pan still work with two fingers.';
 
   @override
-  String get setPalmRejection => 'Palm rejection';
-
-  @override
-  String get setPalmRejectionSub => 'Automatic detection of the resting palm';
-
-  @override
   String get setPressureThickness => 'Pressure → thickness';
 
   @override
   String get setPressureThicknessSub =>
       'Stroke modulation based on stylus pressure';
-
-  @override
-  String get setTiltCalligraphy => 'Tilt → calligraphy';
-
-  @override
-  String get setTiltCalligraphySub =>
-      'Stylus tilt changes stroke width and angle';
 
   @override
   String get setStrokeContinuation => 'Stroke continuation';
@@ -1571,23 +1564,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'Configured, but not in use: sync is going to the other destination.';
 
   @override
-  String libPendingUploadsDrive(int count) {
+  String libPendingNewDrive(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count notebooks still to upload to Google Drive',
-      one: '$count notebook still to upload to Google Drive',
+      other: '$count notebooks aren\'t on Google Drive yet: $names',
+      one: '\"$names\" isn\'t on Google Drive yet',
     );
     return '$_temp0';
   }
 
   @override
-  String libPendingUploadsServer(int count) {
+  String libPendingNewServer(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count notebooks still to upload to your server',
-      one: '$count notebook still to upload to your server',
+      other: '$count notebooks aren\'t on your server yet: $names',
+      one: '\"$names\" isn\'t on your server yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libPendingChanges(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Changes to $count notebooks not uploaded yet: $names',
+      one: 'Changes to \"$names\" not uploaded yet',
     );
     return '$_temp0';
   }

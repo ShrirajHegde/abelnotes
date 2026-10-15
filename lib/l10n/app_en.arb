@@ -262,6 +262,8 @@
   "libNewNotebook": "New notebook",
   "libSketches": "Sketches",
   "libInfiniteSpace": "infinite space",
+  "libShowAll": "Show all",
+  "libShowLess": "Show less",
   "libNewSketch": "New sketch",
   "libInfiniteCanvas": "Infinite canvas",
   "libNew": "New",
@@ -308,12 +310,8 @@
   "setFavoritesFirstSub": "Show favorite notebooks at the top of the library",
   "setStylusOnly": "Stylus only",
   "setStylusOnlySub": "Ignores finger touch while writing. Pinch and pan still work with two fingers.",
-  "setPalmRejection": "Palm rejection",
-  "setPalmRejectionSub": "Automatic detection of the resting palm",
   "setPressureThickness": "Pressure → thickness",
   "setPressureThicknessSub": "Stroke modulation based on stylus pressure",
-  "setTiltCalligraphy": "Tilt → calligraphy",
-  "setTiltCalligraphySub": "Stylus tilt changes stroke width and angle",
   "setStrokeContinuation": "Stroke continuation",
   "setStrokeContinuationSub": "Compensates for brief sensor interruptions (e.g. the dot of an i)",
   "setSyncConnectedDesc": "Connected to a WebDAV server. Notebooks sync across all your devices.",
@@ -422,19 +420,36 @@
   "setSyncSwitchBody": "Your notebooks stay on this device and are uploaded to your Google Drive. The copies already on your server stay where they are, but stop receiving updates from then on. Nothing is deleted.",
   "setSyncSwitchConfirm": "Move to Drive",
   "setSyncInactiveNote": "Configured, but not in use: sync is going to the other destination.",
-  "libPendingUploadsDrive": "{count, plural, one{{count} notebook still to upload to Google Drive} other{{count} notebooks still to upload to Google Drive}}",
-  "@libPendingUploadsDrive": {
+  "libPendingNewDrive": "{count, plural, one{\"{names}\" isn't on Google Drive yet} other{{count} notebooks aren't on Google Drive yet: {names}}}",
+  "@libPendingNewDrive": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },
-  "libPendingUploadsServer": "{count, plural, one{{count} notebook still to upload to your server} other{{count} notebooks still to upload to your server}}",
-  "@libPendingUploadsServer": {
+  "libPendingNewServer": "{count, plural, one{\"{names}\" isn't on your server yet} other{{count} notebooks aren't on your server yet: {names}}}",
+  "@libPendingNewServer": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{Changes to \"{names}\" not uploaded yet} other{Changes to {count} notebooks not uploaded yet: {names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },

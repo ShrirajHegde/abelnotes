@@ -841,6 +841,8 @@
   "libSketches": "Schizzi",
   "@libSketches": {},
   "libInfiniteSpace": "spazio infinito",
+  "libShowAll": "Mostra tutti",
+  "libShowLess": "Mostra meno",
   "@libInfiniteSpace": {},
   "libNewSketch": "Nuovo schizzo",
   "@libNewSketch": {},
@@ -991,18 +993,10 @@
   "@setStylusOnly": {},
   "setStylusOnlySub": "Ignora il tocco del dito durante la scrittura. Pinch e pan continuano a funzionare con due dita.",
   "@setStylusOnlySub": {},
-  "setPalmRejection": "Rifiuto del palmo",
-  "@setPalmRejection": {},
-  "setPalmRejectionSub": "Riconoscimento automatico del palmo appoggiato",
-  "@setPalmRejectionSub": {},
   "setPressureThickness": "Pressione → spessore",
   "@setPressureThickness": {},
   "setPressureThicknessSub": "Modulazione di tratto in base alla pressione dello stylus",
   "@setPressureThicknessSub": {},
-  "setTiltCalligraphy": "Inclinazione → calligrafia",
-  "@setTiltCalligraphy": {},
-  "setTiltCalligraphySub": "L'inclinazione dello stylus altera larghezza e angolo del tratto",
-  "@setTiltCalligraphySub": {},
   "setStrokeContinuation": "Continuazione tratto",
   "@setStrokeContinuation": {},
   "setStrokeContinuationSub": "Compensa brevi interruzioni del sensore (es. punto della i)",
@@ -1303,19 +1297,36 @@
   "@setSyncSwitchConfirm": {},
   "setSyncInactiveNote": "Configurato, ma non in uso: la sincronizzazione va sull'altra destinazione.",
   "@setSyncInactiveNote": {},
-  "libPendingUploadsDrive": "{count, plural, one{{count} quaderno ancora da caricare su Google Drive} other{{count} quaderni ancora da caricare su Google Drive}}",
-  "@libPendingUploadsDrive": {
+  "libPendingNewDrive": "{count, plural, one{«{names}» non è ancora su Google Drive} other{{count} quaderni non sono ancora su Google Drive: {names}}}",
+  "@libPendingNewDrive": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },
-  "libPendingUploadsServer": "{count, plural, one{{count} quaderno ancora da caricare sul tuo server} other{{count} quaderni ancora da caricare sul tuo server}}",
-  "@libPendingUploadsServer": {
+  "libPendingNewServer": "{count, plural, one{«{names}» non è ancora sul tuo server} other{{count} quaderni non sono ancora sul tuo server: {names}}}",
+  "@libPendingNewServer": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{Modifiche a «{names}» non ancora caricate} other{Modifiche a {count} quaderni non ancora caricate: {names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },

@@ -1193,6 +1193,13 @@ class _StrokePreviewPainter extends CustomPainter {
 class HwBottomPageStrip extends StatefulWidget {
   final String? chapterLabel;
 
+  /// The chapter title alone, for phone widths where [chapterLabel] with its
+  /// page count doesn't fit.
+  final String? chapterShortLabel;
+
+  /// Opens the chapter menu, anchored on the chapter button (global rect).
+  final ValueChanged<Rect>? onChapterTap;
+
   /// 1-based page numbers to show. The strip mirrors the active chapter
   /// filter — when no filter is active this should be 1..totalPages.
   final List<int> pageNumbers;
@@ -1222,6 +1229,8 @@ class HwBottomPageStrip extends StatefulWidget {
   const HwBottomPageStrip({
     super.key,
     this.chapterLabel,
+    this.chapterShortLabel,
+    this.onChapterTap,
     required this.pageNumbers,
     required this.currentPage,
     this.previousPage,
@@ -1298,30 +1307,17 @@ class _HwBottomPageStripState extends State<HwBottomPageStrip> {
           horizontal: isCompact ? 10 : 20, vertical: 10),
       child: Row(
         children: [
-          if (!isCompact &&
-              widget.chapterLabel != null &&
+          if (widget.chapterLabel != null &&
               widget.chapterLabel!.isNotEmpty) ...[
-            // Rigid, NOT Flexible: a loose flexible child here would be
-            // allotted half the free width, and the share it doesn't use is
-            // left as a hole at the end of the row instead of going to the
-            // thumbnails.
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
-              child: Text(
-                widget.chapterLabel!.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: p.ink2,
-                  letterSpacing: 0.6,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+            // A pull-down, not a caption: it is where chapters are switched.
+            _ChapterPullDown(
+              label: isCompact
+                  ? (widget.chapterShortLabel ?? widget.chapterLabel!)
+                  : widget.chapterLabel!,
+              maxWidth: isCompact ? 120 : 220,
+              onTap: widget.onChapterTap,
             ),
-            const SizedBox(width: 12),
-            Container(width: 1, height: 18, color: p.paper3),
-            const SizedBox(width: 12),
+            SizedBox(width: isCompact ? 6 : 12),
           ],
           Expanded(
             child: widget.pageNumbers.isEmpty
@@ -1411,6 +1407,57 @@ class _HwBottomPageStripState extends State<HwBottomPageStrip> {
         ],
       ),
     );
+    });
+  }
+}
+
+class _ChapterPullDown extends StatelessWidget {
+  final String label;
+  final double maxWidth;
+  final ValueChanged<Rect>? onTap;
+  const _ChapterPullDown(
+      {required this.label, required this.maxWidth, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HwThemeScope.of(context);
+    return Builder(builder: (ctx) {
+      void open() {
+        final box = ctx.findRenderObject() as RenderBox?;
+        if (box == null || !box.hasSize || onTap == null) return;
+        onTap!(box.localToGlobal(Offset.zero) & box.size);
+      }
+
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Material(
+          color: p.paper2,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onTap == null ? null : open,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink1)),
+                  ),
+                  const SizedBox(width: 4),
+                  HwIcon('chevron-down', size: 12, color: p.ink2),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     });
   }
 }

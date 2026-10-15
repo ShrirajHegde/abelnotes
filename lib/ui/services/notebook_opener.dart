@@ -4,6 +4,7 @@ import 'dart:io' show SocketException;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:abelnotes/ui/primitives/hw_open_route.dart';
+import 'package:abelnotes/ui/primitives/sync_badge.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:abelnotes/core/providers/canvas_provider.dart';
@@ -46,24 +47,31 @@ Future<void> openNotebookAndNavigate(
   if (_openInFlight) return;
   _openInFlight = true;
   try {
-    await _openNotebookAndNavigate(context, ref, entry, origin,
-        Color(entry.metadata.coverColor));
+    await _openNotebookAndNavigate(context, ref, entry, origin);
   } finally {
     _openInFlight = false;
   }
 }
 
-Route<void> _editorRoute(Rect? origin, Color color) => origin == null
+Route<void> _editorRoute(Rect? origin, NotebookEntry entry) => origin == null
     ? MaterialPageRoute(builder: (_) => const CanvasScreen())
     : HwOpenRoute(
-        builder: (_) => const CanvasScreen(), origin: origin, color: color);
+        builder: (_) => const CanvasScreen(),
+        origin: origin,
+        cover: NotebookCover(
+          color: Color(entry.metadata.coverColor),
+          title: entry.metadata.title,
+          texture: coverTextureFor(entry.metadata.paperType),
+          style: CoverStyle.fromKey(entry.metadata.coverStyle),
+          width: origin.width,
+          height: origin.height,
+        ));
 
 Future<void> _openNotebookAndNavigate(
   BuildContext context,
   WidgetRef ref,
   NotebookEntry entry,
   Rect? origin,
-  Color originColor,
 ) async {
   final l10n = AppLocalizations.of(context);
   // A download from an unreachable server can take minutes: the user may
@@ -150,7 +158,7 @@ Future<void> _openNotebookAndNavigate(
 
           if (await abandoned() || !context.mounted) return;
           dismissLoader();
-          await Navigator.of(context).push(_editorRoute(origin, originColor));
+          await Navigator.of(context).push(_editorRoute(origin, entry));
           return;
         }
         // Corrupted loose store (no pages but document expects them) — fall
@@ -192,7 +200,7 @@ Future<void> _openNotebookAndNavigate(
 
         if (await abandoned() || !context.mounted) return;
         dismissLoader();
-        await Navigator.of(context).push(_editorRoute(origin, originColor));
+        await Navigator.of(context).push(_editorRoute(origin, entry));
         return;
       }
     }
@@ -249,7 +257,7 @@ Future<void> _openNotebookAndNavigate(
 
     if (await abandoned() || !context.mounted) return;
     dismissLoader();
-    await Navigator.of(context).push(_editorRoute(origin, originColor));
+    await Navigator.of(context).push(_editorRoute(origin, entry));
   } catch (e) {
     if (!context.mounted || cancelled) return;
     dismissLoader();

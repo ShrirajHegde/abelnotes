@@ -962,6 +962,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libInfiniteSpace => '无限空间';
 
   @override
+  String get libShowAll => '显示全部';
+
+  @override
+  String get libShowLess => '收起';
+
+  @override
   String get libNewSketch => '新建速写';
 
   @override
@@ -1142,22 +1148,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setStylusOnlySub => '书写时忽略手指触摸。双指捏合和平移仍然可用。';
 
   @override
-  String get setPalmRejection => '防误触';
-
-  @override
-  String get setPalmRejectionSub => '自动识别搁在屏幕上的手掌';
-
-  @override
   String get setPressureThickness => '压感 → 粗细';
 
   @override
   String get setPressureThicknessSub => '根据触控笔压力调节笔画粗细';
-
-  @override
-  String get setTiltCalligraphy => '倾斜 → 书法效果';
-
-  @override
-  String get setTiltCalligraphySub => '笔的倾斜角度会改变笔画的宽度和角度';
 
   @override
   String get setStrokeContinuation => '笔画续接';
@@ -1534,23 +1528,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get setSyncInactiveNote => '已配置，但未在使用：同步正在发往另一个目标。';
 
   @override
-  String libPendingUploadsDrive(int count) {
+  String libPendingNewDrive(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '还有 $count 个笔记本待上传到 Google Drive',
-      one: '还有 $count 个笔记本待上传到 Google Drive',
+      other: '$count 个笔记本还没有上传到 Google Drive：$names',
+      one: '“$names”还没有上传到 Google Drive',
     );
     return '$_temp0';
   }
 
   @override
-  String libPendingUploadsServer(int count) {
+  String libPendingNewServer(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '还有 $count 个笔记本待上传到你的服务器',
-      one: '还有 $count 个笔记本待上传到你的服务器',
+      other: '$count 个笔记本还没有上传到你的服务器：$names',
+      one: '“$names”还没有上传到你的服务器',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libPendingChanges(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个笔记本的更改尚未上传：$names',
+      one: '“$names”的更改尚未上传',
     );
     return '$_temp0';
   }

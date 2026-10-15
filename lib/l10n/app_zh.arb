@@ -262,6 +262,8 @@
   "libNewNotebook": "新建笔记本",
   "libSketches": "速写",
   "libInfiniteSpace": "无限空间",
+  "libShowAll": "显示全部",
+  "libShowLess": "收起",
   "libNewSketch": "新建速写",
   "libInfiniteCanvas": "无限画布",
   "libNew": "新建",
@@ -308,12 +310,8 @@
   "setFavoritesFirstSub": "把收藏的笔记本显示在笔记库顶部",
   "setStylusOnly": "仅触控笔",
   "setStylusOnlySub": "书写时忽略手指触摸。双指捏合和平移仍然可用。",
-  "setPalmRejection": "防误触",
-  "setPalmRejectionSub": "自动识别搁在屏幕上的手掌",
   "setPressureThickness": "压感 → 粗细",
   "setPressureThicknessSub": "根据触控笔压力调节笔画粗细",
-  "setTiltCalligraphy": "倾斜 → 书法效果",
-  "setTiltCalligraphySub": "笔的倾斜角度会改变笔画的宽度和角度",
   "setStrokeContinuation": "笔画续接",
   "setStrokeContinuationSub": "弥补传感器的短暂中断（例如写 i 上面那一点）",
   "setSyncConnectedDesc": "已连接到 WebDAV 服务器。笔记本会在你的所有设备之间同步。",
@@ -422,8 +420,39 @@
   "setSyncSwitchBody": "你的笔记本会留在这台设备上，并上传到你的 Google Drive。已经在你服务器上的副本会保持原样，但从现在起不再收到更新。不会删除任何东西。",
   "setSyncSwitchConfirm": "改用 Drive",
   "setSyncInactiveNote": "已配置，但未在使用：同步正在发往另一个目标。",
-  "libPendingUploadsDrive": "{count, plural, one{还有 {count} 个笔记本待上传到 Google Drive} other{还有 {count} 个笔记本待上传到 Google Drive}}",
-  "libPendingUploadsServer": "{count, plural, one{还有 {count} 个笔记本待上传到你的服务器} other{还有 {count} 个笔记本待上传到你的服务器}}",
+  "libPendingNewDrive": "{count, plural, one{“{names}”还没有上传到 Google Drive} other{{count} 个笔记本还没有上传到 Google Drive：{names}}}",
+  "@libPendingNewDrive": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingNewServer": "{count, plural, one{“{names}”还没有上传到你的服务器} other{{count} 个笔记本还没有上传到你的服务器：{names}}}",
+  "@libPendingNewServer": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{“{names}”的更改尚未上传} other{{count} 个笔记本的更改尚未上传：{names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
   "libPendingUploadsHint": "在此期间它们留在这台设备上。请让应用再开一会儿。",
   "libDeleteRemotePending": "已在此处删除。从云端移除失败：将自动重试。",
   "libPendingRemoteDeletes": "{count, plural, one{{count} 个笔记本已在此处删除，仍待从云端移除} other{{count} 个笔记本已在此处删除，仍待从云端移除}}",

@@ -49,6 +49,10 @@ class NotebookEntry {
   /// No server is configured at all: nothing is pending, everything is local.
   final bool serverless;
 
+  /// Its root file was never uploaded, so other devices can't see it at all.
+  /// The rest of [isLocal] are notebooks already there with edits to send.
+  final bool neverUploaded;
+
   const NotebookEntry({
     required this.metadata,
     required this.remotePath,
@@ -57,6 +61,7 @@ class NotebookEntry {
     this.localOnly = false,
     this.notOnDevice = false,
     this.serverless = false,
+    this.neverUploaded = false,
   });
 
   NotebookEntry copyWith({
@@ -67,6 +72,7 @@ class NotebookEntry {
     bool? localOnly,
     bool? notOnDevice,
     bool? serverless,
+    bool? neverUploaded,
   }) =>
       NotebookEntry(
         metadata: metadata ?? this.metadata,
@@ -76,6 +82,7 @@ class NotebookEntry {
         localOnly: localOnly ?? this.localOnly,
         notOnDevice: notOnDevice ?? this.notOnDevice,
         serverless: serverless ?? this.serverless,
+        neverUploaded: neverUploaded ?? this.neverUploaded,
       );
 }
 
@@ -272,6 +279,7 @@ class NotebookListNotifier
       final e = _notebookEntryFromRow(row);
       entries.add(e.copyWith(
         isLocal: e.isLocal || pendingRoots.contains(e.metadata.id),
+        neverUploaded: pendingRoots.contains(e.metadata.id),
         serverless: serverless,
       ));
     }
@@ -873,6 +881,7 @@ class NotebookListNotifier
     required String title,
     String paperType = 'lined',
     int coverColor = 0xFF1565C0,
+    String coverStyle = 'default',
     List<String> tags = const [],
     // Free-sketch mode: one big infinite canvas instead of A4 pages.
     // When true, `paperType` is forced to the infinite marker and the
@@ -906,6 +915,7 @@ class NotebookListNotifier
       modifiedAt: now,
       paperType: effectivePaperType,
       coverColor: coverColor,
+      coverStyle: coverStyle,
       pageCount: 1,
       tags: tags,
       chapters: [
@@ -964,6 +974,7 @@ class NotebookListNotifier
         localModifiedAt: now,
         syncStatus: 'modified',
         coverColor: coverColor,
+        coverStyle: coverStyle,
         paperType: effectivePaperType,
         pageCount: 1,
         createdAt: now,

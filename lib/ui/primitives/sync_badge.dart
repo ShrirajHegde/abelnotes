@@ -228,6 +228,24 @@ class NotebookCover extends StatelessWidget {
 
 enum BackgroundTexture { lines, grid, dots, blank, cornell }
 
+/// The cover texture that matches a notebook's paper type.
+BackgroundTexture coverTextureFor(String paperType) {
+  switch (paperType) {
+    case 'lined':
+    case 'lined_narrow':
+    case 'lined_wide':
+      return BackgroundTexture.lines;
+    case 'grid':
+      return BackgroundTexture.grid;
+    case 'dotted':
+      return BackgroundTexture.dots;
+    case 'cornell':
+      return BackgroundTexture.cornell;
+    default:
+      return BackgroundTexture.blank;
+  }
+}
+
 /// Cover pattern stored in `NotebookMetadata.coverStyle`. [auto] keeps the
 /// paper-type hint; keys from a newer version read as [auto].
 enum CoverStyle {

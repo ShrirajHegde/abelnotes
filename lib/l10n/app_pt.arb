@@ -262,6 +262,8 @@
   "libNewNotebook": "Novo caderno",
   "libSketches": "Rascunhos",
   "libInfiniteSpace": "espaço infinito",
+  "libShowAll": "Ver tudo",
+  "libShowLess": "Ver menos",
   "libNewSketch": "Novo rascunho",
   "libInfiniteCanvas": "Tela infinita",
   "libNew": "Novo",
@@ -308,12 +310,8 @@
   "setFavoritesFirstSub": "Mostrar os cadernos favoritos no topo da biblioteca",
   "setStylusOnly": "Somente caneta",
   "setStylusOnlySub": "Ignora o toque do dedo durante a escrita. Pinçar e arrastar continuam funcionando com dois dedos.",
-  "setPalmRejection": "Rejeição de palma",
-  "setPalmRejectionSub": "Detecção automática da palma apoiada",
   "setPressureThickness": "Pressão → espessura",
   "setPressureThicknessSub": "Modulação do traço conforme a pressão da caneta",
-  "setTiltCalligraphy": "Inclinação → caligrafia",
-  "setTiltCalligraphySub": "A inclinação da caneta muda a largura e o ângulo do traço",
   "setStrokeContinuation": "Continuação do traço",
   "setStrokeContinuationSub": "Compensa interrupções breves do sensor (ex.: o ponto do i)",
   "setSyncConnectedDesc": "Conectado a um servidor WebDAV. Os cadernos sincronizam em todos os seus dispositivos.",
@@ -422,8 +420,39 @@
   "setSyncSwitchBody": "Seus cadernos ficam neste dispositivo e são enviados para o seu Google Drive. As cópias que já estão no seu servidor permanecem onde estão, mas param de receber atualizações a partir de agora. Nada é excluído.",
   "setSyncSwitchConfirm": "Passar para o Drive",
   "setSyncInactiveNote": "Configurado, mas não em uso: a sincronização está indo para o outro destino.",
-  "libPendingUploadsDrive": "{count, plural, one{{count} caderno ainda para enviar ao Google Drive} other{{count} cadernos ainda para enviar ao Google Drive}}",
-  "libPendingUploadsServer": "{count, plural, one{{count} caderno ainda para enviar ao seu servidor} other{{count} cadernos ainda para enviar ao seu servidor}}",
+  "libPendingNewDrive": "{count, plural, one{«{names}» ainda não está no Google Drive} other{{count} cadernos ainda não estão no Google Drive: {names}}}",
+  "@libPendingNewDrive": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingNewServer": "{count, plural, one{«{names}» ainda não está no seu servidor} other{{count} cadernos ainda não estão no seu servidor: {names}}}",
+  "@libPendingNewServer": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{Alterações em «{names}» ainda não enviadas} other{Alterações em {count} cadernos ainda não enviadas: {names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
   "libPendingUploadsHint": "Enquanto isso, eles ficam neste dispositivo. Deixe o app aberto um instante.",
   "libDeleteRemotePending": "Excluído aqui. A remoção da nuvem falhou: será tentada de novo automaticamente.",
   "libPendingRemoteDeletes": "{count, plural, one{{count} caderno excluído aqui, ainda para remover da nuvem} other{{count} cadernos excluídos aqui, ainda para remover da nuvem}}",

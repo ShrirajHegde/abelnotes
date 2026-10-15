@@ -1007,6 +1007,14 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
   /// that genuinely have no pressure (mouse) keep returning 0 so the
   /// notifier's velocity-synth path still kicks in.
   double _penPressure(PointerEvent event) {
+    final p = _rawPenPressure(event);
+    // Pressure switched off: a fixed value, the one strokes without
+    // pressure start from, so every pen stroke gets the same width.
+    if (p > 0 && !ref.read(appSettingsProvider).pressureWidth) return 0.6;
+    return p;
+  }
+
+  double _rawPenPressure(PointerEvent event) {
     final raw = _normalizedEventPressure(event);
     if (raw > 0.0 || kIsWeb || !io.Platform.isLinux) return raw;
     final bridged = LinuxPenPressure.latest();
@@ -1916,7 +1924,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
           ],
         ),
       );
-      if (result == 'cancel') {
+      // Tapping outside the dialog chose nothing: stay, like Cancel.
+      if (result == null || result == 'cancel') {
         // User backed out — re-enable lifecycle autosave.
         _closing = false;
         return false;
@@ -3268,8 +3277,9 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
       // For non-stylus (mouse/touchpad/touch) commit immediately as
       // before — the bug is iPad-specific and adding latency on PC
       // would be a regression.
-      if (event.kind == PointerDeviceKind.stylus ||
-          event.kind == PointerDeviceKind.invertedStylus) {
+      if ((event.kind == PointerDeviceKind.stylus ||
+              event.kind == PointerDeviceKind.invertedStylus) &&
+          ref.read(appSettingsProvider).strokeContinuation) {
         // Snapshot points (notifier stays active so the rendered live
         // stroke remains on screen during the defer window). The
         // snapshot is the dequantized commit copy — the pen fallback
@@ -4818,6 +4828,8 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
                   else if (showPageStrip)
                     HwBottomPageStrip(
                       chapterLabel: _currentChapterLabel(canvasState),
+                      chapterShortLabel: _currentChapterTitle(canvasState),
+                      onChapterTap: _showChapterMenu,
                       // Only show pages of the active chapter (or all when
                       // no chapter filter is active).
                       pageNumbers: [
@@ -8125,6 +8137,102 @@ class _CanvasScreenState extends ConsumerState<CanvasScreen>
     final count = _chapterPageEntries(state, ch).length;
     return AppLocalizations.of(context).csChapterLabelWithCount(
         chapterDisplayTitle(AppLocalizations.of(context), ch.title), count);
+  }
+
+  String? _currentChapterTitle(CanvasState state) {
+    final ch = _resolveActiveChapter(state);
+    return ch == null
+        ? null
+        : chapterDisplayTitle(AppLocalizations.of(context), ch.title);
+  }
+
+  /// Pull-down from the page strip's chapter button: every chapter with its
+  /// page count, the current one ticked, and a way to start a new one.
+  Future<void> _showChapterMenu(Rect anchor) async {
+    final state = ref.read(canvasProvider);
+    if (state == null) return;
+    final l10n = AppLocalizations.of(context);
+    final p = HwThemeScope.of(context);
+    final active = _resolveActiveChapter(state)?.id;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    const newChapter = '\u0000new';
+    // Open above the button, not over it: the strip sits at the bottom, and
+    // a menu shifted up to fit would hide what was tapped.
+    final menuH = state.metadata.chapters.length * 48.0 + 16 + 48 + 16;
+    final top = (anchor.top - menuH - 6).clamp(8.0, anchor.top);
+    final picked = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+          Rect.fromLTWH(anchor.left, top, anchor.width, 1),
+          Offset.zero & overlay.size),
+      color: p.paper0,
+      elevation: 8,
+      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: [
+        for (final ch in state.metadata.chapters)
+          PopupMenuItem(
+            value: ch.id,
+            child: Row(children: [
+              SizedBox(
+                width: 20,
+                child: ch.id == active
+                    ? HwIcon('check', size: 14, color: p.accent)
+                    : null,
+              ),
+              Expanded(
+                child: Text(chapterDisplayTitle(l10n, ch.title),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14, color: p.ink0)),
+              ),
+              const SizedBox(width: 16),
+              Text(l10n.csPagesCount(_chapterPageEntries(state, ch).length),
+                  style: TextStyle(fontSize: 12, color: p.ink2)),
+            ]),
+          ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: newChapter,
+          child: Row(children: [
+            SizedBox(width: 20, child: HwIcon('plus', size: 14, color: p.ink1)),
+            Text(l10n.pmNewChapter,
+                style: TextStyle(fontSize: 14, color: p.ink0)),
+          ]),
+        ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    final notifier = ref.read(canvasProvider.notifier);
+    if (picked != newChapter) {
+      notifier.setActiveChapter(picked);
+      return;
+    }
+    var title = '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: Text(l10n.pmNewChapter),
+        content: TextField(
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.pmChapterNameHint),
+          onChanged: (v) => title = v,
+          onSubmitted: (_) => Navigator.pop(dCtx, true),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: Text(l10n.pmCancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: Text(l10n.pmOk)),
+        ],
+      ),
+    );
+    if (ok == true && title.trim().isNotEmpty && mounted) {
+      notifier.addChapter(title.trim());
+    }
   }
 
   /// Right-click / long-press on a thumbnail in the bottom strip.

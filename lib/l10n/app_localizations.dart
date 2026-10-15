@@ -1680,6 +1680,18 @@ abstract class AppLocalizations {
   /// **'spazio infinito'**
   String get libInfiniteSpace;
 
+  /// No description provided for @libShowAll.
+  ///
+  /// In it, this message translates to:
+  /// **'Mostra tutti'**
+  String get libShowAll;
+
+  /// No description provided for @libShowLess.
+  ///
+  /// In it, this message translates to:
+  /// **'Mostra meno'**
+  String get libShowLess;
+
   /// No description provided for @libNewSketch.
   ///
   /// In it, this message translates to:
@@ -1956,18 +1968,6 @@ abstract class AppLocalizations {
   /// **'Ignora il tocco del dito durante la scrittura. Pinch e pan continuano a funzionare con due dita.'**
   String get setStylusOnlySub;
 
-  /// No description provided for @setPalmRejection.
-  ///
-  /// In it, this message translates to:
-  /// **'Rifiuto del palmo'**
-  String get setPalmRejection;
-
-  /// No description provided for @setPalmRejectionSub.
-  ///
-  /// In it, this message translates to:
-  /// **'Riconoscimento automatico del palmo appoggiato'**
-  String get setPalmRejectionSub;
-
   /// No description provided for @setPressureThickness.
   ///
   /// In it, this message translates to:
@@ -1979,18 +1979,6 @@ abstract class AppLocalizations {
   /// In it, this message translates to:
   /// **'Modulazione di tratto in base alla pressione dello stylus'**
   String get setPressureThicknessSub;
-
-  /// No description provided for @setTiltCalligraphy.
-  ///
-  /// In it, this message translates to:
-  /// **'Inclinazione → calligrafia'**
-  String get setTiltCalligraphy;
-
-  /// No description provided for @setTiltCalligraphySub.
-  ///
-  /// In it, this message translates to:
-  /// **'L\'inclinazione dello stylus altera larghezza e angolo del tratto'**
-  String get setTiltCalligraphySub;
 
   /// No description provided for @setStrokeContinuation.
   ///
@@ -2640,17 +2628,23 @@ abstract class AppLocalizations {
   /// **'Configurato, ma non in uso: la sincronizzazione va sull\'altra destinazione.'**
   String get setSyncInactiveNote;
 
-  /// No description provided for @libPendingUploadsDrive.
+  /// No description provided for @libPendingNewDrive.
   ///
   /// In it, this message translates to:
-  /// **'{count, plural, one{{count} quaderno ancora da caricare su Google Drive} other{{count} quaderni ancora da caricare su Google Drive}}'**
-  String libPendingUploadsDrive(int count);
+  /// **'{count, plural, one{«{names}» non è ancora su Google Drive} other{{count} quaderni non sono ancora su Google Drive: {names}}}'**
+  String libPendingNewDrive(int count, String names);
 
-  /// No description provided for @libPendingUploadsServer.
+  /// No description provided for @libPendingNewServer.
   ///
   /// In it, this message translates to:
-  /// **'{count, plural, one{{count} quaderno ancora da caricare sul tuo server} other{{count} quaderni ancora da caricare sul tuo server}}'**
-  String libPendingUploadsServer(int count);
+  /// **'{count, plural, one{«{names}» non è ancora sul tuo server} other{{count} quaderni non sono ancora sul tuo server: {names}}}'**
+  String libPendingNewServer(int count, String names);
+
+  /// No description provided for @libPendingChanges.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{Modifiche a «{names}» non ancora caricate} other{Modifiche a {count} quaderni non ancora caricate: {names}}}'**
+  String libPendingChanges(int count, String names);
 
   /// No description provided for @libPendingUploadsHint.
   ///

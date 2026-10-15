@@ -980,6 +980,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get libInfiniteSpace => 'unendliche Fläche';
 
   @override
+  String get libShowAll => 'Alle anzeigen';
+
+  @override
+  String get libShowLess => 'Weniger anzeigen';
+
+  @override
   String get libNewSketch => 'Neue Skizze';
 
   @override
@@ -1163,24 +1169,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ignoriert Fingerberührungen beim Schreiben. Zoomen und Verschieben mit zwei Fingern funktionieren weiterhin.';
 
   @override
-  String get setPalmRejection => 'Handballenerkennung';
-
-  @override
-  String get setPalmRejectionSub =>
-      'Automatische Erkennung des aufliegenden Handballens';
-
-  @override
   String get setPressureThickness => 'Druck → Stärke';
 
   @override
   String get setPressureThicknessSub => 'Strichstärke abhängig vom Stiftdruck';
-
-  @override
-  String get setTiltCalligraphy => 'Neigung → Kalligrafie';
-
-  @override
-  String get setTiltCalligraphySub =>
-      'Die Neigung des Stifts verändert Breite und Winkel des Strichs';
 
   @override
   String get setStrokeContinuation => 'Strichfortsetzung';
@@ -1580,23 +1572,34 @@ class AppLocalizationsDe extends AppLocalizations {
       'Eingerichtet, aber nicht in Verwendung: Die Synchronisierung läuft über das andere Ziel.';
 
   @override
-  String libPendingUploadsDrive(int count) {
+  String libPendingNewDrive(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count Notizbücher noch nicht in Google Drive hochgeladen',
-      one: '$count Notizbuch noch nicht in Google Drive hochgeladen',
+      other: '$count Notizbücher sind noch nicht in Google Drive: $names',
+      one: '„$names“ ist noch nicht in Google Drive',
     );
     return '$_temp0';
   }
 
   @override
-  String libPendingUploadsServer(int count) {
+  String libPendingNewServer(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count Notizbücher noch nicht auf deinen Server hochgeladen',
-      one: '$count Notizbuch noch nicht auf deinen Server hochgeladen',
+      other: '$count Notizbücher sind noch nicht auf deinem Server: $names',
+      one: '„$names“ ist noch nicht auf deinem Server',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libPendingChanges(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Änderungen an $count Notizbüchern noch nicht hochgeladen: $names',
+      one: 'Änderungen an „$names“ noch nicht hochgeladen',
     );
     return '$_temp0';
   }

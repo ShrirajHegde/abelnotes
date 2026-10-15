@@ -262,6 +262,8 @@
   "libNewNotebook": "Nouveau carnet",
   "libSketches": "Croquis",
   "libInfiniteSpace": "espace infini",
+  "libShowAll": "Tout afficher",
+  "libShowLess": "Afficher moins",
   "libNewSketch": "Nouveau croquis",
   "libInfiniteCanvas": "Toile infinie",
   "libNew": "Nouveau",
@@ -308,12 +310,8 @@
   "setFavoritesFirstSub": "Afficher les carnets favoris en haut de la bibliothèque",
   "setStylusOnly": "Stylet uniquement",
   "setStylusOnlySub": "Ignore le toucher du doigt pendant l'écriture. Le zoom et le déplacement à deux doigts continuent de fonctionner.",
-  "setPalmRejection": "Rejet de la paume",
-  "setPalmRejectionSub": "Détection automatique de la paume posée",
   "setPressureThickness": "Pression → épaisseur",
   "setPressureThicknessSub": "Modulation du trait selon la pression du stylet",
-  "setTiltCalligraphy": "Inclinaison → calligraphie",
-  "setTiltCalligraphySub": "L'inclinaison du stylet modifie la largeur et l'angle du trait",
   "setStrokeContinuation": "Continuité du trait",
   "setStrokeContinuationSub": "Compense de brèves interruptions du capteur (par ex. le point du i)",
   "setSyncConnectedDesc": "Connecté à un serveur WebDAV. Les carnets se synchronisent sur tous vos appareils.",
@@ -422,19 +420,36 @@
   "setSyncSwitchBody": "Vos carnets restent sur cet appareil et sont envoyés vers votre Google Drive. Les copies déjà présentes sur votre serveur restent où elles sont, mais ne reçoivent plus de mises à jour à partir de ce moment. Rien n'est supprimé.",
   "setSyncSwitchConfirm": "Basculer vers Drive",
   "setSyncInactiveNote": "Configuré, mais inutilisé : la synchronisation se fait vers l'autre destination.",
-  "libPendingUploadsDrive": "{count, plural, one{{count} carnet reste à envoyer vers Google Drive} other{{count} carnets restent à envoyer vers Google Drive}}",
-  "@libPendingUploadsDrive": {
+  "libPendingNewDrive": "{count, plural, one{« {names} » n'est pas encore sur Google Drive} other{{count} carnets ne sont pas encore sur Google Drive : {names}}}",
+  "@libPendingNewDrive": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },
-  "libPendingUploadsServer": "{count, plural, one{{count} carnet reste à envoyer vers votre serveur} other{{count} carnets restent à envoyer vers votre serveur}}",
-  "@libPendingUploadsServer": {
+  "libPendingNewServer": "{count, plural, one{« {names} » n'est pas encore sur votre serveur} other{{count} carnets ne sont pas encore sur votre serveur : {names}}}",
+  "@libPendingNewServer": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{Modifications de « {names} » pas encore envoyées} other{Modifications de {count} carnets pas encore envoyées : {names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -877,6 +878,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2>
                 title: res.title,
                 paperType: res.paperType,
                 coverColor: argb,
+                coverStyle: res.coverStyle.key,
                 chapterTitle: chapterTitle,
               );
       if (mounted) _openNotebook(entry);
@@ -1397,7 +1399,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2>
       NotebookEntry entry) async {
     var color = Color(entry.metadata.coverColor);
     var style = CoverStyle.fromKey(entry.metadata.coverStyle);
-    final texture = _textureFor(entry.metadata.paperType);
+    final texture = coverTextureFor(entry.metadata.paperType);
     return showModalBottomSheet<({Color color, CoverStyle style})>(
       context: context,
       isScrollControlled: true,
@@ -2421,7 +2423,7 @@ class _Body extends StatelessWidget {
 }
 
 // ─── Sketch (infinite canvas) section ─────────────────────────────
-class _SketchSection extends StatelessWidget {
+class _SketchSection extends StatefulWidget {
   final double hPad;
   final List<NotebookEntry> sketches;
   final VoidCallback onCreateSketch;
@@ -2436,73 +2438,281 @@ class _SketchSection extends StatelessWidget {
   });
 
   @override
+  State<_SketchSection> createState() => _SketchSectionState();
+}
+
+/// Sketches sit on a shelf, App Store style: it stops on whole tiles, the
+/// next one peeks in, a mouse can drag or wheel it, arrows appear on hover,
+/// and "Show all" lays them out as a grid instead.
+class _SketchSectionState extends State<_SketchSection> {
+  static const double _tileW = 220;
+  static const double _gap = 16;
+  static const double _tileH = 128;
+
+  final _ctrl = ScrollController();
+  bool _expanded = false;
+  bool _hover = false;
+  bool _atStart = true;
+  bool _atEnd = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_syncEnds);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _syncEnds() {
+    if (!_ctrl.hasClients) return;
+    final pos = _ctrl.position;
+    final atStart = pos.pixels <= pos.minScrollExtent + 1;
+    final atEnd = pos.pixels >= pos.maxScrollExtent - 1;
+    if (atStart != _atStart || atEnd != _atEnd) {
+      setState(() {
+        _atStart = atStart;
+        _atEnd = atEnd;
+      });
+    }
+  }
+
+  void _page(int dir) {
+    if (!_ctrl.hasClients) return;
+    final pos = _ctrl.position;
+    const stride = _tileW + _gap;
+    final perView = (pos.viewportDimension / stride).floor().clamp(1, 99);
+    final target = ((pos.pixels / stride).round() + dir * perView) * stride;
+    _ctrl.animateTo(target.clamp(pos.minScrollExtent, pos.maxScrollExtent),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic);
+  }
+
+  Widget _tile(NotebookEntry e) => _SketchTile(
+        entry: e,
+        onTap: () => widget.onOpen(e),
+        onLongPress: () => widget.onLongPress(e),
+      );
+
+  @override
   Widget build(BuildContext context) {
     final p = HwThemeScope.of(context);
+    final l10n = AppLocalizations.of(context);
+    final sketches = widget.sketches;
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Flexible(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Flexible(
-                      child: Text(AppLocalizations.of(context).libSketches,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: HwType.title
-                              .copyWith(color: p.ink0, fontSize: 17)),
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                          AppLocalizations.of(context).libInfiniteSpace,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, color: p.ink2)),
-                    ),
-                  ],
+      padding: EdgeInsets.fromLTRB(widget.hPad, 14, widget.hPad, 4),
+      child: LayoutBuilder(builder: (context, c) {
+        final fit = ((c.maxWidth + _gap) / (_tileW + _gap)).floor();
+        final overflows = sketches.length > fit;
+        // Phone width: title, "Show all" and a plus, like an iOS section.
+        final compact = c.maxWidth < 600;
+        if (!overflows && _expanded) _expanded = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _syncEnds());
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Flexible(
+                        child: Text(l10n.libSketches,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: HwType.title
+                                .copyWith(color: p.ink0, fontSize: 17)),
+                      ),
+                      if (!compact) ...[
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(l10n.libInfiniteSpace,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 13, color: p.ink2)),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Flexible so a narrow phone shortens the button's label
-              // rather than pushing the whole header off the screen.
-              Flexible(
-                child: HwButton(
-                  leading: const HwIcon('plus', size: 16),
-                  label: AppLocalizations.of(context).libNewSketch,
-                  style: HwButtonStyle.primary,
-                  onPressed: onCreateSketch,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 128,
-            child: sketches.isEmpty
-                ? _SketchEmptyTile(onTap: onCreateSketch)
-                : ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: sketches.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 16),
-                    itemBuilder: (_, i) => _SketchTile(
-                      entry: sketches[i],
-                      onTap: () => onOpen(sketches[i]),
-                      onLongPress: () => onLongPress(sketches[i]),
+                const SizedBox(width: 12),
+                if (overflows) ...[
+                  TextButton(
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    style: TextButton.styleFrom(foregroundColor: p.accent),
+                    child: Text(_expanded ? l10n.libShowLess : l10n.libShowAll),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (compact)
+                  HwButton.icon(
+                    icon: const HwIcon('plus', size: 16),
+                    tooltip: l10n.libNewSketch,
+                    style: HwButtonStyle.primary,
+                    onPressed: widget.onCreateSketch,
+                  )
+                else
+                  // Flexible so a narrow window shortens the button's label
+                  // rather than pushing the whole header off the screen.
+                  Flexible(
+                    child: HwButton(
+                      leading: const HwIcon('plus', size: 16),
+                      label: l10n.libNewSketch,
+                      style: HwButtonStyle.primary,
+                      onPressed: widget.onCreateSketch,
                     ),
                   ),
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topLeft,
+              child: sketches.isEmpty
+                  ? SizedBox(
+                      height: _tileH,
+                      child: _SketchEmptyTile(onTap: widget.onCreateSketch))
+                  : _expanded
+                      ? Wrap(
+                          spacing: _gap,
+                          runSpacing: _gap,
+                          children: [
+                            for (final e in sketches)
+                              SizedBox(height: _tileH, child: _tile(e)),
+                          ],
+                        )
+                      : _shelf(p),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _shelf(HwPalette p) {
+    final list = ScrollConfiguration(
+      // A mouse drags the shelf like a finger; the wheel scrolls it sideways.
+      behavior: ScrollConfiguration.of(context).copyWith(
+        scrollbars: false,
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      ),
+      child: Listener(
+        onPointerSignal: (signal) {
+          if (signal is! PointerScrollEvent || !_ctrl.hasClients) return;
+          final d = signal.scrollDelta;
+          final delta = d.dy.abs() > d.dx.abs() ? d.dy : d.dx;
+          final pos = _ctrl.position;
+          _ctrl.jumpTo((pos.pixels + delta)
+              .clamp(pos.minScrollExtent, pos.maxScrollExtent));
+        },
+        child: ListView.separated(
+          controller: _ctrl,
+          scrollDirection: Axis.horizontal,
+          physics: const _TileSnapPhysics(extent: _tileW + _gap),
+          itemCount: widget.sketches.length,
+          separatorBuilder: (_, __) => const SizedBox(width: _gap),
+          itemBuilder: (_, i) =>
+              SizedBox(width: _tileW, child: _tile(widget.sketches[i])),
+        ),
       ),
     );
+    // Fade the edge that has more behind it, so the shelf reads as one.
+    final faded = ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (r) => LinearGradient(
+        colors: [
+          _atStart ? Colors.black : Colors.transparent,
+          Colors.black,
+          Colors.black,
+          _atEnd ? Colors.black : Colors.transparent,
+        ],
+        stops: const [0, 0.04, 0.96, 1],
+      ).createShader(r),
+      child: list,
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: SizedBox(
+        height: _tileH,
+        child: Stack(children: [
+          Positioned.fill(child: faded),
+          if (_hover && !_atStart)
+            Positioned(
+                left: 6,
+                top: (_tileH - 34) / 2,
+                child: _ShelfArrow(icon: 'chevron-left', onTap: () => _page(-1))),
+          if (_hover && !_atEnd)
+            Positioned(
+                right: 6,
+                top: (_tileH - 34) / 2,
+                child: _ShelfArrow(icon: 'chevron-right', onTap: () => _page(1))),
+        ]),
+      ),
+    );
+  }
+}
+
+class _ShelfArrow extends StatelessWidget {
+  final String icon;
+  final VoidCallback onTap;
+  const _ShelfArrow({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HwThemeScope.of(context);
+    return HwGlass(
+      borderRadius: BorderRadius.circular(17),
+      strong: true,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 34,
+          height: 34,
+          child: Center(child: HwIcon(icon, size: 16, color: p.ink0)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lets a fling travel, then settles on a whole tile.
+class _TileSnapPhysics extends ScrollPhysics {
+  final double extent;
+  const _TileSnapPhysics({required this.extent, super.parent});
+
+  @override
+  _TileSnapPhysics applyTo(ScrollPhysics? ancestor) =>
+      _TileSnapPhysics(extent: extent, parent: buildParent(ancestor));
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    if ((velocity <= 0 && position.pixels <= position.minScrollExtent) ||
+        (velocity >= 0 && position.pixels >= position.maxScrollExtent)) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    final tolerance = toleranceFor(position);
+    final projected = position.pixels + velocity * 0.25;
+    final target = ((projected / extent).roundToDouble() * extent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if ((target - position.pixels).abs() < tolerance.distance) return null;
+    return ScrollSpringSimulation(spring, position.pixels, target, velocity,
+        tolerance: tolerance);
   }
 }
 
@@ -2817,7 +3027,7 @@ class _CoverTile extends StatelessWidget {
                         // Hide the cover's built-in star — we render our own
                         // tappable one above.
                         favorite: false,
-                        texture: _textureFor(entry.metadata.paperType),
+                        texture: coverTextureFor(entry.metadata.paperType),
                         width: coverWidth,
                         height: coverHeight,
                         onTap: () {
@@ -3221,7 +3431,10 @@ class _PendingUploadsNotice extends ConsumerWidget {
         .value;
     final blocked =
         waiting.where((e) => needsOpen.contains(e.metadata.id)).length;
-    final pending = waiting.length - blocked;
+    final unblocked =
+        waiting.where((e) => !needsOpen.contains(e.metadata.id));
+    final fresh = unblocked.where((e) => e.neverUploaded).toList();
+    final edited = unblocked.where((e) => !e.neverUploaded).toList();
 
     final backend = ref.watch(appSettingsProvider.select((s) => s.syncBackend));
     // Local-only has no destination to name and nothing is queued for one.
@@ -3246,16 +3459,20 @@ class _PendingUploadsNotice extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (pending > 0) ...[
+                  if (fresh.isNotEmpty)
                     Text(
                       backend == SyncBackend.drive
-                          ? l10n.libPendingUploadsDrive(pending)
-                          : l10n.libPendingUploadsServer(pending),
+                          ? l10n.libPendingNewDrive(fresh.length, _titles(fresh))
+                          : l10n.libPendingNewServer(
+                              fresh.length, _titles(fresh)),
                       style: TextStyle(fontSize: 13, color: p.ink1),
                     ),
+                  if (edited.isNotEmpty)
+                    Text(l10n.libPendingChanges(edited.length, _titles(edited)),
+                        style: TextStyle(fontSize: 13, color: p.ink1)),
+                  if (fresh.isNotEmpty || edited.isNotEmpty)
                     Text(l10n.libPendingUploadsHint,
                         style: TextStyle(fontSize: 11, color: p.ink3)),
-                  ],
                   if (blocked > 0) ...[
                     Text(l10n.qtNeedsOpenToUpload(blocked),
                         style: TextStyle(fontSize: 13, color: p.ink1)),
@@ -3270,6 +3487,13 @@ class _PendingUploadsNotice extends ConsumerWidget {
       );
     });
   }
+}
+
+/// Up to three titles, then a count of the rest.
+String _titles(List<NotebookEntry> entries) {
+  final shown = entries.take(3).map((e) => e.metadata.title).join(', ');
+  final more = entries.length - 3;
+  return more > 0 ? '$shown +$more' : shown;
 }
 
 /// A delete that hasn't reached the remote yet: other devices still show it.
@@ -3531,29 +3755,14 @@ class _CoverStyleSwatch extends StatelessWidget {
   }
 }
 
-BackgroundTexture _textureFor(String paperType) {
-  switch (paperType) {
-    case 'lined':
-    case 'lined_narrow':
-    case 'lined_wide':
-      return BackgroundTexture.lines;
-    case 'grid':
-      return BackgroundTexture.grid;
-    case 'dotted':
-      return BackgroundTexture.dots;
-    case 'cornell':
-      return BackgroundTexture.cornell;
-    default:
-      return BackgroundTexture.blank;
-  }
-}
-
 // ─── New notebook dialog ──────────────────────────────────────────
 class _NewNotebookResult {
   final String title;
   final Color coverColor;
+  final CoverStyle coverStyle;
   final String paperType;
-  _NewNotebookResult(this.title, this.coverColor, this.paperType);
+  _NewNotebookResult(
+      this.title, this.coverColor, this.coverStyle, this.paperType);
 }
 
 class _NewNotebookDialog extends StatefulWidget {
@@ -3565,6 +3774,7 @@ class _NewNotebookDialog extends StatefulWidget {
 class _NewNotebookDialogState extends State<_NewNotebookDialog> {
   final _titleCtrl = TextEditingController();
   Color _color = HwTheme.cover1;
+  CoverStyle _style = CoverStyle.auto;
   String _paper = 'lined';
   bool _showError = false;
 
@@ -3580,7 +3790,8 @@ class _NewNotebookDialogState extends State<_NewNotebookDialog> {
       setState(() => _showError = true);
       return;
     }
-    Navigator.of(context).pop(_NewNotebookResult(t, _color, _paper));
+    Navigator.of(context)
+        .pop(_NewNotebookResult(t, _color, _style, _paper));
   }
 
   @override
@@ -3592,69 +3803,103 @@ class _NewNotebookDialogState extends State<_NewNotebookDialog> {
       title: Text(l10n.libNewNotebook),
       content: SizedBox(
         width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _titleCtrl,
-              autofocus: true,
-              onChanged: (_) {
-                if (_showError) setState(() => _showError = false);
-              },
-              onEditingComplete: _submit,
-              decoration: InputDecoration(
-                labelText: l10n.libNotebookTitleLabel,
-                errorText: _showError ? l10n.qlNameRequired : null,
-                border: const OutlineInputBorder(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _titleCtrl,
+                autofocus: true,
+                onChanged: (_) {
+                  if (_showError) setState(() => _showError = false);
+                },
+                onEditingComplete: _submit,
+                decoration: InputDecoration(
+                  labelText: l10n.libNotebookTitleLabel,
+                  errorText: _showError ? l10n.qlNameRequired : null,
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(l10n.libCoverLabel,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: p.ink2,
-                    letterSpacing: 0.6,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: HwTheme.covers
-                  .map((c) => GestureDetector(
-                        onTap: () => setState(() => _color = c),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: c,
-                            borderRadius: BorderRadius.circular(6),
-                            border: _color == c
-                                ? Border.all(color: p.ink0, width: 2)
-                                : null,
+              const SizedBox(height: 20),
+              Text(l10n.libCoverLabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: p.ink2,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: HwTheme.covers
+                    .map((c) => GestureDetector(
+                          onTap: () => setState(() => _color = c),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: c,
+                              borderRadius: BorderRadius.circular(6),
+                              border: _color == c
+                                  ? Border.all(color: p.ink0, width: 2)
+                                  : null,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+              Text(l10n.libCoverPattern,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: p.ink2,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final st in CoverStyle.values)
+                    Tooltip(
+                      message: _coverStyleName(l10n, st),
+                      child: Semantics(
+                        button: true,
+                        selected: st == _style,
+                        label: _coverStyleName(l10n, st),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _style = st),
+                          child: _CoverStyleSwatch(
+                            color: _color,
+                            style: st,
+                            texture: coverTextureFor(_paper),
+                            selected: st == _style,
                           ),
                         ),
-                      ))
-                  .toList(),
-            ),
-            const SizedBox(height: 20),
-            Text(l10n.libPaperLabel,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: p.ink2,
-                    letterSpacing: 0.6,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              children: [
-                _paperChip(l10n.libPaperBlank, 'blank'),
-                _paperChip(l10n.libPaperLined, 'lined'),
-                _paperChip(l10n.libPaperGrid, 'grid'),
-                _paperChip(l10n.libPaperDotted, 'dotted'),
-              ],
-            ),
-          ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(l10n.libPaperLabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: p.ink2,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                children: [
+                  _paperChip(l10n.libPaperBlank, 'blank'),
+                  _paperChip(l10n.libPaperLined, 'lined'),
+                  _paperChip(l10n.libPaperGrid, 'grid'),
+                  _paperChip(l10n.libPaperDotted, 'dotted'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

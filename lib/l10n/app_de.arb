@@ -262,6 +262,8 @@
   "libNewNotebook": "Neues Notizbuch",
   "libSketches": "Skizzen",
   "libInfiniteSpace": "unendliche Fläche",
+  "libShowAll": "Alle anzeigen",
+  "libShowLess": "Weniger anzeigen",
   "libNewSketch": "Neue Skizze",
   "libInfiniteCanvas": "Unendliche Fläche",
   "libNew": "Neu",
@@ -308,12 +310,8 @@
   "setFavoritesFirstSub": "Favorisierte Notizbücher oben in der Bibliothek anzeigen",
   "setStylusOnly": "Nur Stift",
   "setStylusOnlySub": "Ignoriert Fingerberührungen beim Schreiben. Zoomen und Verschieben mit zwei Fingern funktionieren weiterhin.",
-  "setPalmRejection": "Handballenerkennung",
-  "setPalmRejectionSub": "Automatische Erkennung des aufliegenden Handballens",
   "setPressureThickness": "Druck → Stärke",
   "setPressureThicknessSub": "Strichstärke abhängig vom Stiftdruck",
-  "setTiltCalligraphy": "Neigung → Kalligrafie",
-  "setTiltCalligraphySub": "Die Neigung des Stifts verändert Breite und Winkel des Strichs",
   "setStrokeContinuation": "Strichfortsetzung",
   "setStrokeContinuationSub": "Gleicht kurze Aussetzer des Sensors aus (z. B. beim i-Punkt)",
   "setSyncConnectedDesc": "Mit einem WebDAV-Server verbunden. Notizbücher werden auf allen deinen Geräten synchronisiert.",
@@ -422,19 +420,36 @@
   "setSyncSwitchBody": "Deine Notizbücher bleiben auf diesem Gerät und werden in dein Google Drive hochgeladen. Die Kopien auf deinem Server bleiben, wo sie sind, erhalten aber ab dann keine Aktualisierungen mehr. Es wird nichts gelöscht.",
   "setSyncSwitchConfirm": "Auf Drive umstellen",
   "setSyncInactiveNote": "Eingerichtet, aber nicht in Verwendung: Die Synchronisierung läuft über das andere Ziel.",
-  "libPendingUploadsDrive": "{count, plural, one{{count} Notizbuch noch nicht in Google Drive hochgeladen} other{{count} Notizbücher noch nicht in Google Drive hochgeladen}}",
-  "@libPendingUploadsDrive": {
+  "libPendingNewDrive": "{count, plural, one{„{names}“ ist noch nicht in Google Drive} other{{count} Notizbücher sind noch nicht in Google Drive: {names}}}",
+  "@libPendingNewDrive": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },
-  "libPendingUploadsServer": "{count, plural, one{{count} Notizbuch noch nicht auf deinen Server hochgeladen} other{{count} Notizbücher noch nicht auf deinen Server hochgeladen}}",
-  "@libPendingUploadsServer": {
+  "libPendingNewServer": "{count, plural, one{„{names}“ ist noch nicht auf deinem Server} other{{count} Notizbücher sind noch nicht auf deinem Server: {names}}}",
+  "@libPendingNewServer": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{Änderungen an „{names}“ noch nicht hochgeladen} other{Änderungen an {count} Notizbüchern noch nicht hochgeladen: {names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },

@@ -262,6 +262,8 @@
   "libNewNotebook": "Nuevo cuaderno",
   "libSketches": "Bocetos",
   "libInfiniteSpace": "espacio infinito",
+  "libShowAll": "Ver todo",
+  "libShowLess": "Ver menos",
   "libNewSketch": "Nuevo boceto",
   "libInfiniteCanvas": "Lienzo infinito",
   "libNew": "Nuevo",
@@ -308,12 +310,8 @@
   "setFavoritesFirstSub": "Muestra los cuadernos favoritos al principio de la biblioteca",
   "setStylusOnly": "Solo stylus",
   "setStylusOnlySub": "Ignora el toque del dedo mientras escribes. Pellizcar y desplazar siguen funcionando con dos dedos.",
-  "setPalmRejection": "Rechazo de palma",
-  "setPalmRejectionSub": "Detección automática de la palma apoyada",
   "setPressureThickness": "Presión → grosor",
   "setPressureThicknessSub": "Modulación del trazo según la presión del stylus",
-  "setTiltCalligraphy": "Inclinación → caligrafía",
-  "setTiltCalligraphySub": "La inclinación del stylus altera el ancho y el ángulo del trazo",
   "setStrokeContinuation": "Continuación del trazo",
   "setStrokeContinuationSub": "Compensa breves interrupciones del sensor (p. ej., el punto de la i)",
   "setSyncConnectedDesc": "Conectado a un servidor WebDAV. Los cuadernos se sincronizan en todos tus dispositivos.",
@@ -422,19 +420,36 @@
   "setSyncSwitchBody": "Tus cuadernos se quedan en este dispositivo y se suben a tu Google Drive. Las copias que ya están en tu servidor se quedan donde están, pero dejan de recibir actualizaciones. No se borra nada.",
   "setSyncSwitchConfirm": "Mover a Drive",
   "setSyncInactiveNote": "Configurado, pero sin usar: la sincronización va al otro destino.",
-  "libPendingUploadsDrive": "{count, plural, one{{count} cuaderno aún por subir a Google Drive} other{{count} cuadernos aún por subir a Google Drive}}",
-  "@libPendingUploadsDrive": {
+  "libPendingNewDrive": "{count, plural, one{«{names}» aún no está en Google Drive} other{{count} cuadernos aún no están en Google Drive: {names}}}",
+  "@libPendingNewDrive": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },
-  "libPendingUploadsServer": "{count, plural, one{{count} cuaderno aún por subir a tu servidor} other{{count} cuadernos aún por subir a tu servidor}}",
-  "@libPendingUploadsServer": {
+  "libPendingNewServer": "{count, plural, one{«{names}» aún no está en tu servidor} other{{count} cuadernos aún no están en tu servidor: {names}}}",
+  "@libPendingNewServer": {
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "libPendingChanges": "{count, plural, one{Cambios en «{names}» aún sin subir} other{Cambios en {count} cuadernos aún sin subir: {names}}}",
+  "@libPendingChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
       }
     }
   },

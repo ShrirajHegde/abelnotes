@@ -133,6 +133,14 @@ class AppSettings {
   /// to get palm rejection.
   final bool? stylusOnlyDrawing;
 
+  /// Stylus pressure sets the stroke width. Off, every pen stroke has the
+  /// width a pressure-less device gets.
+  final bool pressureWidth;
+
+  /// Stylus lifts shorter than a few ms continue the same stroke instead of
+  /// starting a new one (sensor dropouts on iPad).
+  final bool strokeContinuation;
+
   /// Which remote the notebooks sync to: 'webdav' for the user's own
   /// server, 'drive' for their Google Drive, null for local-only. One
   /// backend at a time — a notebook living in two places at once would give
@@ -172,6 +180,8 @@ class AppSettings {
     this.toolDock = const ToolDockConfig(),
     this.mouseDraws = false,
     this.stylusOnlyDrawing,
+    this.pressureWidth = true,
+    this.strokeContinuation = true,
     this.lastTool,
     this.syncBackend,
     this.showPageStrip = true,
@@ -198,6 +208,8 @@ class AppSettings {
     ToolDockConfig? toolDock,
     bool? mouseDraws,
     bool? stylusOnlyDrawing,
+    bool? pressureWidth,
+    bool? strokeContinuation,
     String? lastTool,
     String? syncBackend,
     /// copyWith can't tell "leave it" from "set it to null", and going back
@@ -220,6 +232,8 @@ class AppSettings {
         toolDock: toolDock ?? this.toolDock,
         mouseDraws: mouseDraws ?? this.mouseDraws,
         stylusOnlyDrawing: stylusOnlyDrawing ?? this.stylusOnlyDrawing,
+        pressureWidth: pressureWidth ?? this.pressureWidth,
+        strokeContinuation: strokeContinuation ?? this.strokeContinuation,
         lastTool: lastTool ?? this.lastTool,
         syncBackend:
             clearSyncBackend ? null : (syncBackend ?? this.syncBackend),
@@ -298,6 +312,8 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
         toolDock: dock,
         mouseDraws: map['mouse_draws'] as bool? ?? false,
         stylusOnlyDrawing: map['stylus_only_drawing'] as bool?,
+        pressureWidth: map['pressure_width'] as bool? ?? true,
+        strokeContinuation: map['stroke_continuation'] as bool? ?? true,
         lastTool: map['last_tool'] as String?,
         syncBackend: map['sync_backend'] as String?,
         showPageStrip: map['show_page_strip'] as bool? ?? true,
@@ -325,6 +341,8 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
         'mouse_draws': state.mouseDraws,
         if (state.stylusOnlyDrawing != null)
           'stylus_only_drawing': state.stylusOnlyDrawing,
+        'pressure_width': state.pressureWidth,
+        'stroke_continuation': state.strokeContinuation,
         if (state.lastTool != null) 'last_tool': state.lastTool,
         if (state.syncBackend != null) 'sync_backend': state.syncBackend,
         'show_page_strip': state.showPageStrip,
@@ -402,6 +420,16 @@ class AppSettingsNotifier extends StateNotifier<AppSettings> {
 
   void setStylusOnlyDrawing(bool v) {
     state = state.copyWith(stylusOnlyDrawing: v);
+    _persist();
+  }
+
+  void setPressureWidth(bool v) {
+    state = state.copyWith(pressureWidth: v);
+    _persist();
+  }
+
+  void setStrokeContinuation(bool v) {
+    state = state.copyWith(strokeContinuation: v);
     _persist();
   }
 

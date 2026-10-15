@@ -69,6 +69,7 @@ class _FakeLibrary extends NotebookListNotifier {
           ),
           remotePath: '/nb$i.abelnote',
           isLocal: i.isOdd,
+          neverUploaded: i == 1,
         ),
     ]);
   }
@@ -347,7 +348,7 @@ void main() {
     }
   });
 
-  testWidgets('the library says how many notebooks are still to upload',
+  testWidgets('the library names what is still to upload, new apart from edits',
       (tester) async {
     // The per-row cloud badge only answers the question if you know to hover
     // it, and after switching remotes there can be a dozen pending at once.
@@ -375,8 +376,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     collect(tester, 'PendingNotice', 412, 1.0);
 
-    // The fake library marks the odd-numbered entries local.
-    expect(find.text(l10n.libPendingUploadsDrive(3)), findsOneWidget);
+    // The fake library marks the odd-numbered entries local, nb1 never uploaded.
+    expect(find.text(l10n.libPendingNewDrive(1, 'Quaderno 1')), findsOneWidget);
+    expect(find.text(l10n.libPendingChanges(2, 'Quaderno 3, Quaderno 5')),
+        findsOneWidget);
 
     // The library arms a 2s delayed retry and a periodic background sync on
     // open. Let the delayed one fire, then dispose the tree so the periodic

@@ -22,7 +22,7 @@ class HwOpenRoute<T> extends PageRouteBuilder<T> {
   HwOpenRoute({
     required WidgetBuilder builder,
     required Rect origin,
-    required Color color,
+    required Widget cover,
   }) : super(
           // fullscreenDialog keeps the library still underneath instead of
           // the Cupertino parallax slide.
@@ -43,13 +43,13 @@ class HwOpenRoute<T> extends PageRouteBuilder<T> {
               animation: curved,
               child: child,
               builder: (context, child) =>
-                  _grow(context, curved.value, origin, color, child!),
+                  _grow(context, curved.value, origin, cover, child!),
             );
           },
         );
 
   static Widget _grow(
-      BuildContext context, double t, Rect origin, Color color, Widget child) {
+      BuildContext context, double t, Rect origin, Widget cover, Widget child) {
     final p = HwThemeScope.of(context);
     final size = MediaQuery.sizeOf(context);
     final rect = Rect.lerp(origin, Offset.zero & size, t)!;
@@ -83,7 +83,17 @@ class HwOpenRoute<T> extends PageRouteBuilder<T> {
             IgnorePointer(
               child: Opacity(
                 opacity: (1 - t / 0.55).clamp(0.0, 1.0),
-                child: ColoredBox(color: color),
+                // Drawn at the tapped size and stretched, so the pattern
+                // grows with the cover instead of re-tiling.
+                child: FittedBox(
+                  fit: BoxFit.fill,
+                  child: SizedBox.fromSize(
+                    size: origin.size,
+                    // Route overlays sit above any Material: give the cover's
+                    // title a text style instead of the debug fallback.
+                    child: Material(type: MaterialType.transparency, child: cover),
+                  ),
+                ),
               ),
             ),
           ]),

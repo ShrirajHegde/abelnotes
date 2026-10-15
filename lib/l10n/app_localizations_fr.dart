@@ -980,6 +980,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get libInfiniteSpace => 'espace infini';
 
   @override
+  String get libShowAll => 'Tout afficher';
+
+  @override
+  String get libShowLess => 'Afficher moins';
+
+  @override
   String get libNewSketch => 'Nouveau croquis';
 
   @override
@@ -1163,24 +1169,11 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ignore le toucher du doigt pendant l\'écriture. Le zoom et le déplacement à deux doigts continuent de fonctionner.';
 
   @override
-  String get setPalmRejection => 'Rejet de la paume';
-
-  @override
-  String get setPalmRejectionSub => 'Détection automatique de la paume posée';
-
-  @override
   String get setPressureThickness => 'Pression → épaisseur';
 
   @override
   String get setPressureThicknessSub =>
       'Modulation du trait selon la pression du stylet';
-
-  @override
-  String get setTiltCalligraphy => 'Inclinaison → calligraphie';
-
-  @override
-  String get setTiltCalligraphySub =>
-      'L\'inclinaison du stylet modifie la largeur et l\'angle du trait';
 
   @override
   String get setStrokeContinuation => 'Continuité du trait';
@@ -1581,23 +1574,34 @@ class AppLocalizationsFr extends AppLocalizations {
       'Configuré, mais inutilisé : la synchronisation se fait vers l\'autre destination.';
 
   @override
-  String libPendingUploadsDrive(int count) {
+  String libPendingNewDrive(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count carnets restent à envoyer vers Google Drive',
-      one: '$count carnet reste à envoyer vers Google Drive',
+      other: '$count carnets ne sont pas encore sur Google Drive : $names',
+      one: '« $names » n\'est pas encore sur Google Drive',
     );
     return '$_temp0';
   }
 
   @override
-  String libPendingUploadsServer(int count) {
+  String libPendingNewServer(int count, String names) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count carnets restent à envoyer vers votre serveur',
-      one: '$count carnet reste à envoyer vers votre serveur',
+      other: '$count carnets ne sont pas encore sur votre serveur : $names',
+      one: '« $names » n\'est pas encore sur votre serveur',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libPendingChanges(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Modifications de $count carnets pas encore envoyées : $names',
+      one: 'Modifications de « $names » pas encore envoyées',
     );
     return '$_temp0';
   }
