@@ -24,6 +24,23 @@ import Vision
         VisionOcr.handle(call, result: result)
       }
     }
+
+    // Lets the canvas slow its idle polling under Low Power Mode.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "SyncThrift") {
+      let channel = FlutterMethodChannel(
+        name: "abelnotes/sync_thrift",
+        binaryMessenger: registrar.messenger())
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "state" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        result([
+          "metered": false,
+          "lowPower": ProcessInfo.processInfo.isLowPowerModeEnabled,
+        ])
+      }
+    }
   }
 }
 

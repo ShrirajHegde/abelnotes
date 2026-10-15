@@ -2580,6 +2580,24 @@ abstract class AppLocalizations {
   /// **'Intanto restano su questo dispositivo. Lascia l\'app aperta un momento.'**
   String get libPendingUploadsHint;
 
+  /// No description provided for @libDeleteRemotePending.
+  ///
+  /// In it, this message translates to:
+  /// **'Eliminato qui. Rimozione dal cloud non riuscita: verrà ritentata in automatico.'**
+  String get libDeleteRemotePending;
+
+  /// No description provided for @libPendingRemoteDeletes.
+  ///
+  /// In it, this message translates to:
+  /// **'{count, plural, one{{count} quaderno eliminato qui, ancora da togliere dal cloud} other{{count} quaderni eliminati qui, ancora da togliere dal cloud}}'**
+  String libPendingRemoteDeletes(int count);
+
+  /// No description provided for @libPendingRemoteDeletesHint.
+  ///
+  /// In it, this message translates to:
+  /// **'Finché non va via, gli altri dispositivi possono ancora vederlo. Nuovo tentativo appena la connessione torna.'**
+  String get libPendingRemoteDeletesHint;
+
   /// No description provided for @libServerUnreachable.
   ///
   /// In it, this message translates to:

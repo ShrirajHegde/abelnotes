@@ -1558,6 +1558,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'They stay on this device meanwhile. Leave the app open a moment.';
 
   @override
+  String get libDeleteRemotePending =>
+      'Deleted here. Removing it from the cloud failed: it will be retried automatically.';
+
+  @override
+  String libPendingRemoteDeletes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notebooks deleted here, still to remove from the cloud',
+      one: '$count notebook deleted here, still to remove from the cloud',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libPendingRemoteDeletesHint =>
+      'Until it\'s gone, your other devices can still see it. Retrying as soon as the connection is back.';
+
+  @override
   String get libServerUnreachable => 'Server not reachable';
 
   @override

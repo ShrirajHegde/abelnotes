@@ -1563,6 +1563,25 @@ class AppLocalizationsPt extends AppLocalizations {
       'Enquanto isso, eles ficam neste dispositivo. Deixe o app aberto um instante.';
 
   @override
+  String get libDeleteRemotePending =>
+      'Excluído aqui. A remoção da nuvem falhou: será tentada de novo automaticamente.';
+
+  @override
+  String libPendingRemoteDeletes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cadernos excluídos aqui, ainda para remover da nuvem',
+      one: '$count caderno excluído aqui, ainda para remover da nuvem',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libPendingRemoteDeletesHint =>
+      'Até lá, seus outros dispositivos ainda podem vê-lo. Nova tentativa assim que a conexão voltar.';
+
+  @override
   String get libServerUnreachable => 'Servidor inacessível';
 
   @override

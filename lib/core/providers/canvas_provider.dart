@@ -18,6 +18,7 @@ import 'package:abelnotes/core/providers/offline_providers.dart';
 import 'package:abelnotes/core/providers/remote_store_provider.dart'
     show remoteStoreProvider;
 import 'package:abelnotes/core/services/sync_service.dart';
+import 'package:abelnotes/core/services/sync_thrift.dart';
 import 'package:abelnotes/core/services/symbol_library_service.dart';
 import 'package:abelnotes/core/services/webdav_service.dart' show WebDavException;
 import 'package:abelnotes/features/canvas/data/render_engine.dart'
@@ -5109,6 +5110,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   /// pan event loop.
   void _bumpInteract() {
     _lastInteractAt = DateTime.now();
+    _wakePullFromIdle();
   }
 
   void setZoom(double zoom) {
@@ -8255,6 +8257,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     final hasPendingDeletes =
         _pendingPageDeletes.isNotEmpty || _pendingAssetDeletes.isNotEmpty;
     if (!state!.isDirty && !hasPendingDeletes) return;
+    _wakePullFromIdle();
     final token = await _acquireSyncLock();
     if (token == null || state == null) return;
     bool lockTransferred = false;
@@ -9071,6 +9074,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     if (state == null) return;
     if (_pullTimer != null) return;
     debugPrint('[Canvas] Resume: restarting pull timer');
+    _idlePullCount = 0;
     _startPullTimer();
   }
 
@@ -9126,6 +9130,14 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     super.dispose();
   }
 
+  /// Drops a backed-off pull cadence straight back to the fast one: someone
+  /// is using this device, so remote edits should show up promptly.
+  void _wakePullFromIdle() {
+    if (_idlePullCount < _idlePullThreshold) return;
+    _idlePullCount = 0;
+    if (_pullTimer != null) _schedulePullTick();
+  }
+
   /// Self-rescheduling pull tick. Adds random jitter per cycle so multiple
   /// devices don't hit the server in lockstep, and skips firing while a
   /// save() is still holding the sync lock (save releases the lock only
@@ -9143,6 +9155,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   /// we drop straight back to the fast cadence.
   void _schedulePullTick() {
     if (_disposed) return;
+    if (_idlePullCount >= _deepIdleThreshold) unawaited(SyncThrift.refresh());
     final base = _pullIntervalForIdle();
     final jitterMs = _pullJitterRng.nextInt(AppConfig.deltaPullJitter.inMilliseconds + 1);
     final next = base + Duration(milliseconds: jitterMs);
@@ -9186,14 +9199,12 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
   int _idlePullCount = 0;
   static const int _idlePullThreshold = 3;
   static const Duration _idlePullMaxInterval = Duration(seconds: 30);
-  /// After this much sustained idle (≥ this many consecutive noop
-  /// pulls), extend the backoff cap to 5 minutes. The fast cadence
-  /// still resumes immediately on real activity (a save resets
-  /// _idlePullCount to 0). This trims background HEAD chatter from
-  /// ~3000/h to ~300/h on notebooks the user leaves open but doesn't
-  /// touch — meaningful battery saving on mobile + Tailscale.
+  /// After this many consecutive noop pulls the cap stretches to
+  /// [_deepIdleMaxInterval], or [_deepIdleThriftyInterval] on metered
+  /// data / battery saver. Local activity resets it ([_wakePullFromIdle]).
   static const int _deepIdleThreshold = 30;
-  static const Duration _deepIdleMaxInterval = Duration(minutes: 5);
+  static const Duration _deepIdleMaxInterval = Duration(seconds: 60);
+  static const Duration _deepIdleThriftyInterval = Duration(minutes: 5);
 
   /// Counter for the ordered-commit safety-net: every Nth pull does the
   /// full pages/ PROPFIND even when meta-ETag is unchanged, to catch
@@ -9214,16 +9225,14 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
     if (_idlePullCount < _idlePullThreshold) {
       return AppConfig.deltaPullInterval;
     }
-    // Deep-idle: after ~30 consecutive noop pulls (≈ 10 minutes
-    // of sustained inactivity at the 30s cap) extend the cap to 5
-    // minutes. Trades immediate cross-device sync latency (still
-    // sub-5min vs sub-30s) for ~10× less network chatter on idle
-    // open notebooks.
     final maxIntervalMs = _idlePullCount >= _deepIdleThreshold
-        ? _deepIdleMaxInterval.inMilliseconds
+        ? (SyncThrift.thrifty
+                ? _deepIdleThriftyInterval
+                : _deepIdleMaxInterval)
+            .inMilliseconds
         : _idlePullMaxInterval.inMilliseconds;
     // Exponential backoff: idle=3 → 4s, 4 → 8s, 5 → 16s, 6+ → 30s,
-    // 30+ → 5min (cap).
+    // 30+ → 60s (5 min when thrifty).
     final shift = (_idlePullCount - _idlePullThreshold).clamp(0, 8);
     final ms = AppConfig.deltaPullInterval.inMilliseconds * (2 << shift);
     final capped = ms.clamp(

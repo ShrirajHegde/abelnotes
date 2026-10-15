@@ -1568,6 +1568,25 @@ class AppLocalizationsFr extends AppLocalizations {
       'En attendant, ils restent sur cet appareil. Laissez l\'application ouverte un instant.';
 
   @override
+  String get libDeleteRemotePending =>
+      'Supprimé ici. Échec du retrait du cloud : nouvel essai automatique.';
+
+  @override
+  String libPendingRemoteDeletes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count carnets supprimés ici, encore à retirer du cloud',
+      one: '$count carnet supprimé ici, encore à retirer du cloud',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libPendingRemoteDeletesHint =>
+      'En attendant, vos autres appareils peuvent encore le voir. Nouvel essai dès que la connexion revient.';
+
+  @override
   String get libServerUnreachable => 'Serveur injoignable';
 
   @override

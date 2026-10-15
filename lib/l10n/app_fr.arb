@@ -427,6 +427,18 @@
   },
   "libPendingUploadsHint": "En attendant, ils restent sur cet appareil. Laissez l'application ouverte un instant.",
   "@libPendingUploadsHint": {},
+  "libDeleteRemotePending": "Supprimé ici. Échec du retrait du cloud : nouvel essai automatique.",
+  "@libDeleteRemotePending": {},
+  "libPendingRemoteDeletes": "{count, plural, one{{count} carnet supprimé ici, encore à retirer du cloud} other{{count} carnets supprimés ici, encore à retirer du cloud}}",
+  "@libPendingRemoteDeletes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libPendingRemoteDeletesHint": "En attendant, vos autres appareils peuvent encore le voir. Nouvel essai dès que la connexion revient.",
+  "@libPendingRemoteDeletesHint": {},
   "libServerUnreachable": "Serveur injoignable",
   "@libServerUnreachable": {},
   "libServerUnreachableHint": "Les modifications restent sur cet appareil et sont envoyées dès le retour de la connexion.",

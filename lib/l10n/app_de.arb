@@ -427,6 +427,18 @@
   },
   "libPendingUploadsHint": "Solange bleiben sie auf diesem Gerät. Lass die App einen Moment geöffnet.",
   "@libPendingUploadsHint": {},
+  "libDeleteRemotePending": "Hier gelöscht. Entfernen aus der Cloud fehlgeschlagen: wird automatisch wiederholt.",
+  "@libDeleteRemotePending": {},
+  "libPendingRemoteDeletes": "{count, plural, one{{count} Notizbuch hier gelöscht, noch aus der Cloud zu entfernen} other{{count} Notizbücher hier gelöscht, noch aus der Cloud zu entfernen}}",
+  "@libPendingRemoteDeletes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libPendingRemoteDeletesHint": "Bis dahin sehen deine anderen Geräte es noch. Neuer Versuch, sobald die Verbindung wieder da ist.",
+  "@libPendingRemoteDeletesHint": {},
   "libServerUnreachable": "Server nicht erreichbar",
   "@libServerUnreachable": {},
   "libServerUnreachableHint": "Änderungen bleiben auf diesem Gerät und werden hochgeladen, sobald die Verbindung wieder da ist.",

@@ -15,6 +15,7 @@ import 'package:abelnotes/core/providers/notebook_provider.dart';
 import 'package:abelnotes/core/providers/offline_providers.dart';
 import 'package:abelnotes/core/services/file_open_receiver.dart';
 import 'package:abelnotes/core/services/sync_service.dart';
+import 'package:abelnotes/core/services/sync_thrift.dart';
 import 'dart:io';
 
 import 'package:abelnotes/features/auth/login_screen.dart';
@@ -52,20 +53,24 @@ class LibraryScreenV2 extends ConsumerStatefulWidget {
   ConsumerState<LibraryScreenV2> createState() => _LibraryScreenV2State();
 }
 
-class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
+class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2>
+    with WidgetsBindingObserver {
   final _searchCtrl = TextEditingController();
   final _scroll = ScrollController();
   String _query = '';
   Timer? _bgSyncTimer;
   String? _selectedFolderId;
 
-  /// How often the library re-syncs while it's the visible route.
-  static const _bgSyncInterval = Duration(minutes: 5);
+  /// How often the library re-syncs while it's the visible route; the slow
+  /// one applies on metered data or battery saver.
+  static const _bgSyncInterval = Duration(seconds: 60);
+  static const _bgSyncThriftyInterval = Duration(minutes: 5);
   bool _bgSyncInFlight = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       ref.read(notebookListProvider.notifier).loadDeletedElsewhere();
       ref.read(notebookListProvider.notifier).refresh();
@@ -83,7 +88,31 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
     // library only ever synced at cold boot: notebooks another device created
     // stayed invisible, and an upload that failed while the network was down
     // sat pending until the app was restarted.
-    _bgSyncTimer = Timer.periodic(_bgSyncInterval, (_) => _backgroundSync());
+    _scheduleBackgroundSync();
+  }
+
+  void _scheduleBackgroundSync() {
+    _bgSyncTimer?.cancel();
+    final interval =
+        SyncThrift.thrifty ? _bgSyncThriftyInterval : _bgSyncInterval;
+    _bgSyncTimer = Timer(interval, () async {
+      await SyncThrift.refresh();
+      await _backgroundSync();
+      if (mounted && _bgSyncTimer != null) _scheduleBackgroundSync();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // No polling from the background; catch up the moment the app is back.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _bgSyncTimer?.cancel();
+      _bgSyncTimer = null;
+    } else if (state == AppLifecycleState.resumed && _bgSyncTimer == null) {
+      _scheduleBackgroundSync();
+      unawaited(_backgroundSync());
+    }
   }
 
   /// One background sync tick. Skipped while a notebook is open (this screen
@@ -93,7 +122,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
   Future<void> _backgroundSync() async {
     if (!mounted || _bgSyncInFlight) return;
     if (ModalRoute.of(context)?.isCurrent != true) return;
-    if (ref.read(webdavServiceProvider) == null) return;
+    if (ref.read(remoteStoreProvider) == null) return;
     final notifier = ref.read(notebookListProvider.notifier);
     if (notifier.isSyncing.value) return; // a visible sync is already running
     _bgSyncInFlight = true;
@@ -135,7 +164,9 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _bgSyncTimer?.cancel();
+    _bgSyncTimer = null;
     _searchCtrl.dispose();
     _scroll.dispose();
     super.dispose();
@@ -210,6 +241,7 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
                 _StorageFullNotice(notifier: notebookNotifier),
                 _ServerUnreachableNotice(notifier: notebookNotifier),
                 _PendingUploadsNotice(entries: notebooks),
+                _PendingRemoteDeletesNotice(notifier: notebookNotifier),
               ]),
             ),
           ];
@@ -1187,11 +1219,16 @@ class _LibraryScreenV2State extends ConsumerState<LibraryScreenV2> {
               ],
             ),
           );
-          if (confirm == true) {
-            final trashId = await ref
+          if (confirm == true && mounted) {
+            final messenger = ScaffoldMessenger.of(context);
+            final result = await ref
                 .read(notebookListProvider.notifier)
                 .deleteNotebook(entry);
-            if (trashId == null) _toast(l10n.qlDeletedNoTrash);
+            if (result.trashId == null) _toast(l10n.qlDeletedNoTrash);
+            if (result.remotePending) {
+              messenger.showSnackBar(
+                  SnackBar(content: Text(l10n.libDeleteRemotePending)));
+            }
           }
           break;
       }
@@ -3161,6 +3198,51 @@ class _PendingUploadsNotice extends ConsumerWidget {
         ),
       );
     });
+  }
+}
+
+/// A delete that hasn't reached the remote yet: other devices still show it.
+class _PendingRemoteDeletesNotice extends StatelessWidget {
+  final NotebookListNotifier notifier;
+  const _PendingRemoteDeletesNotice({required this.notifier});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HwThemeScope.of(context);
+    final l10n = AppLocalizations.of(context);
+    return ValueListenableBuilder<int>(
+      valueListenable: notifier.pendingRemoteDeletes,
+      builder: (_, count, __) {
+        if (count == 0) return const SizedBox.shrink();
+        return LayoutBuilder(builder: (ctx, c) {
+          final compact = c.maxWidth < 600;
+          return Container(
+            width: double.infinity,
+            color: p.paper2,
+            padding: EdgeInsets.symmetric(
+                horizontal: compact ? 16 : 32, vertical: 10),
+            child: Row(
+              children: [
+                const HwIcon('cloud-pending',
+                    size: 14, color: HwTheme.syncPending),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.libPendingRemoteDeletes(count),
+                          style: TextStyle(fontSize: 13, color: p.ink1)),
+                      Text(l10n.libPendingRemoteDeletesHint,
+                          style: TextStyle(fontSize: 11, color: p.ink3)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 }
 

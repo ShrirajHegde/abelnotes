@@ -427,6 +427,18 @@
   },
   "libPendingUploadsHint": "Mientras tanto se quedan en este dispositivo. Deja la aplicación abierta un momento.",
   "@libPendingUploadsHint": {},
+  "libDeleteRemotePending": "Eliminado aquí. No se pudo quitar de la nube: se reintentará automáticamente.",
+  "@libDeleteRemotePending": {},
+  "libPendingRemoteDeletes": "{count, plural, one{{count} cuaderno eliminado aquí, aún por quitar de la nube} other{{count} cuadernos eliminados aquí, aún por quitar de la nube}}",
+  "@libPendingRemoteDeletes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libPendingRemoteDeletesHint": "Hasta entonces, tus otros dispositivos aún pueden verlo. Se reintenta en cuanto vuelva la conexión.",
+  "@libPendingRemoteDeletesHint": {},
   "libServerUnreachable": "Servidor no accesible",
   "@libServerUnreachable": {},
   "libServerUnreachableHint": "Los cambios se quedan en este dispositivo y se suben en cuanto vuelva la conexión.",

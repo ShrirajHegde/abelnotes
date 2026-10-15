@@ -1520,6 +1520,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libPendingUploadsHint => '在此期间它们留在这台设备上。请让应用再开一会儿。';
 
   @override
+  String get libDeleteRemotePending => '已在此处删除。从云端移除失败：将自动重试。';
+
+  @override
+  String libPendingRemoteDeletes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个笔记本已在此处删除，仍待从云端移除',
+      one: '$count 个笔记本已在此处删除，仍待从云端移除',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libPendingRemoteDeletesHint => '在移除之前，你的其他设备仍可能看到它。连接恢复后会立即重试。';
+
+  @override
   String get libServerUnreachable => '无法连接服务器';
 
   @override

@@ -13,6 +13,7 @@ import 'package:abelnotes/core/providers/canvas_provider.dart' show canvasProvid
 import 'package:abelnotes/core/providers/offline_providers.dart';
 import 'package:abelnotes/core/services/crash_logger.dart';
 import 'package:abelnotes/core/services/file_service.dart';
+import 'package:abelnotes/core/services/pending_remote_deletes.dart';
 import 'package:abelnotes/core/services/pending_root_uploads.dart';
 import 'package:abelnotes/core/services/search_service.dart';
 import 'package:abelnotes/core/services/sync_service.dart';
@@ -181,6 +182,9 @@ class NotebookListNotifier
     }
   }
 
+  /// Notebooks deleted here whose remote copy is still waiting to go.
+  final ValueNotifier<int> pendingRemoteDeletes = ValueNotifier<int>(0);
+
   /// Progress during first sync: "downloaded/total" where 0/0 means PROPFIND
   /// is still in flight. UI shows this beside the spinner so first-install
   /// users can tell work is happening.
@@ -194,6 +198,7 @@ class NotebookListNotifier
     serverUnreachable.dispose();
     deletedElsewhere.dispose();
     needsOpenToUpload.dispose();
+    pendingRemoteDeletes.dispose();
     syncProgress.dispose();
     super.dispose();
   }
@@ -260,6 +265,7 @@ class NotebookListNotifier
     // A root file still queued means other devices can't see the notebook,
     // whatever the delta sync says: the card must not read as synced.
     final pendingRoots = await PendingRootUploads.load();
+    pendingRemoteDeletes.value = (await PendingRemoteDeletes.load()).length;
     final serverless = _ref.read(syncServiceProvider)?.isOffline ?? true;
     final entries = <NotebookEntry>[];
     for (final row in allMeta) {
@@ -324,9 +330,13 @@ class NotebookListNotifier
     // Rows we deliberately don't download but still want an accurate card
     // for: refreshed from the tiny delta metadata further down.
     final metaOnlyRows = <Map<String, dynamic>>[];
+    // Deleted here, remote delete still queued: downloading it would bring
+    // the notebook straight back.
+    final deletingPaths = (await PendingRemoteDeletes.load()).values.toSet();
     for (final file in remoteFiles) {
       final remotePath = '${AppConfig.defaultRemotePath}${file.name}';
       seenRemotePaths.add(remotePath);
+      if (deletingPaths.contains(remotePath)) continue;
 
       final localRow = localByPath[remotePath];
       final localEtag = localRow?['etag'] as String?;
@@ -572,8 +582,10 @@ class NotebookListNotifier
       // that mistake permanently wipes the local .ncnote + snapshots + DB
       // row for a notebook the user is still actively using.
       bool deltaAlive = true;
+      bool deltaConfirmed = false;
       try {
         deltaAlive = await syncService.deltaFolderExists(id, fresh: true);
+        deltaConfirmed = deltaAlive;
       } catch (e) {
         debugPrint('[Library] deltaFolderExists error for $id — assuming alive: $e');
         deltaAlive = true; // explicit: uncertainty ⇒ keep local
@@ -581,6 +593,13 @@ class NotebookListNotifier
       if (deltaAlive) {
         debugPrint('[Library] Root .ncnote missing for $id but delta folder alive — '
             'skipping cleanup (notebook still exists on server)');
+        // Other devices discover notebooks only through the root file, so
+        // without it this one stays invisible there. Pre-fix notebooks never
+        // entered the pending set: heal them here.
+        if (deltaConfirmed) {
+          await PendingRootUploads.add(id);
+          await _uploadPendingRoot(syncService, fileService, id);
+        }
         continue;
       }
       debugPrint('[Library] Notebook $id removed from server, cleaning local cache');
@@ -1144,28 +1163,26 @@ class NotebookListNotifier
   }
 
   /// Soft-deletes a notebook: moves it to the local trash and removes it from
-  /// the remote server (when reachable). Can be undone via [restoreFromTrash].
-  Future<String?> deleteNotebook(NotebookEntry entry) async {
+  /// the remote server. Can be undone via [restoreFromTrash]. `remotePending`
+  /// is true when the remote delete failed and was queued for retry.
+  Future<({String? trashId, bool remotePending})> deleteNotebook(
+      NotebookEntry entry) async {
     final webdav = _ref.read(remoteStoreProvider);
     final fileService = _ref.read(fileServiceProvider);
     final thumbs = _ref.read(thumbnailServiceProvider);
+    final id = entry.metadata.id;
 
-    // Delete remote (if connected)
+    var remotePending = false;
     if (webdav != null) {
       try {
-        await webdav.delete(entry.remotePath);
+        await _deleteRemoteNotebook(id, entry.remotePath);
       } catch (e) {
-        debugPrint('[Library] Remote delete failed: $e');
+        debugPrint('[Library] Remote delete failed, queued: $e');
+        unawaited(CrashLogger.append('[Delete] $id queued: $e'));
+        await PendingRemoteDeletes.add(id, entry.remotePath);
+        remotePending = true;
       }
-      // Also remove the exploded delta folder — leaving it alive makes the
-      // other devices' cleanup logic keep (and re-upload) the notebook.
-      try {
-        await _ref
-            .read(syncServiceProvider)
-            ?.deleteDeltaFolder(entry.metadata.id);
-      } catch (e) {
-        debugPrint('[Library] Delta folder delete failed: $e');
-      }
+      pendingRemoteDeletes.value = (await PendingRemoteDeletes.load()).length;
     }
 
     // Soft-delete locally: preserve the .ncnote in the trash so it can be restored.
@@ -1180,7 +1197,35 @@ class NotebookListNotifier
     state = AsyncValue.data(
       current.where((e) => e.metadata.id != entry.metadata.id).toList(),
     );
-    return trashId;
+    return (trashId: trashId, remotePending: remotePending);
+  }
+
+  /// Delta folder first: a root left behind is a stale copy the retry
+  /// removes, a delta left behind makes other devices keep and re-upload it.
+  Future<void> _deleteRemoteNotebook(String id, String remotePath) async {
+    final remote = _ref.read(remoteStoreProvider);
+    final syncService = _ref.read(syncServiceProvider);
+    if (remote == null || syncService == null) {
+      throw StateError('No remote to delete from');
+    }
+    await syncService.deleteDeltaFolder(id);
+    if (remotePath.isNotEmpty) await remote.delete(remotePath);
+  }
+
+  Future<void> _retryPendingRemoteDeletes() async {
+    final pending = await PendingRemoteDeletes.load();
+    for (final e in pending.entries) {
+      try {
+        await _deleteRemoteNotebook(e.key, e.value);
+        await PendingRemoteDeletes.remove(e.key);
+        unawaited(CrashLogger.append('[Delete] ${e.key} remote delete done'));
+      } catch (err) {
+        unawaited(CrashLogger.append('[Delete] ${e.key} retry failed: $err'));
+      }
+    }
+    if (pending.isNotEmpty && mounted) {
+      pendingRemoteDeletes.value = (await PendingRemoteDeletes.load()).length;
+    }
   }
 
   /// Restores a notebook from the trash. Re-uploads it to the remote on the
@@ -1188,6 +1233,13 @@ class NotebookListNotifier
   Future<void> restoreFromTrash(String trashId) async {
     final fileService = _ref.read(fileServiceProvider);
     final meta = await fileService.restoreFromTrash(trashId);
+    final id = meta?['id'] as String?;
+    if (id != null) {
+      // Wanted back: cancel a queued remote delete, and re-upload the root
+      // the delete may already have removed.
+      await PendingRemoteDeletes.remove(id);
+      await PendingRootUploads.add(id);
+    }
     if (meta != null) await refresh();
   }
 
@@ -1552,6 +1604,7 @@ class NotebookListNotifier
     // throw. Bail before the loop instead of throwing once per notebook.
     if (syncService == null || syncService.isOffline) return;
 
+    await _retryPendingRemoteDeletes();
     await _uploadPendingRoots(syncService, fileService);
 
     final dirtyRows = await fileService.getDirtyNotebooks();

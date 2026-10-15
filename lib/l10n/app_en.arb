@@ -427,6 +427,18 @@
   },
   "libPendingUploadsHint": "They stay on this device meanwhile. Leave the app open a moment.",
   "@libPendingUploadsHint": {},
+  "libDeleteRemotePending": "Deleted here. Removing it from the cloud failed: it will be retried automatically.",
+  "@libDeleteRemotePending": {},
+  "libPendingRemoteDeletes": "{count, plural, one{{count} notebook deleted here, still to remove from the cloud} other{{count} notebooks deleted here, still to remove from the cloud}}",
+  "@libPendingRemoteDeletes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libPendingRemoteDeletesHint": "Until it's gone, your other devices can still see it. Retrying as soon as the connection is back.",
+  "@libPendingRemoteDeletesHint": {},
   "libServerUnreachable": "Server not reachable",
   "@libServerUnreachable": {},
   "libServerUnreachableHint": "Changes stay on this device and upload as soon as the connection is back.",

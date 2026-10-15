@@ -4,5 +4,17 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- Outbound connections: WebDAV/Nextcloud and the Google Drive APIs.
+	     Without this a sandboxed release build cannot reach any network. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Desktop Google sign-in binds a short-lived listener on 127.0.0.1 to
+	     collect the authorization code (see google_sign_in_desktop.dart), and
+	     the sandbox needs this to let it listen at all. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- Import and export go through the system file picker. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 </dict>
 </plist>

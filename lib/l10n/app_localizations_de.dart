@@ -1567,6 +1567,26 @@ class AppLocalizationsDe extends AppLocalizations {
       'Solange bleiben sie auf diesem Gerät. Lass die App einen Moment geöffnet.';
 
   @override
+  String get libDeleteRemotePending =>
+      'Hier gelöscht. Entfernen aus der Cloud fehlgeschlagen: wird automatisch wiederholt.';
+
+  @override
+  String libPendingRemoteDeletes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Notizbücher hier gelöscht, noch aus der Cloud zu entfernen',
+      one: '$count Notizbuch hier gelöscht, noch aus der Cloud zu entfernen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libPendingRemoteDeletesHint =>
+      'Bis dahin sehen deine anderen Geräte es noch. Neuer Versuch, sobald die Verbindung wieder da ist.';
+
+  @override
   String get libServerUnreachable => 'Server nicht erreichbar';
 
   @override

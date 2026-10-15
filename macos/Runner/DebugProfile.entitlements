@@ -6,7 +6,14 @@
 	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
+	<!-- Kept in step with Release.entitlements so a debug run on a Mac hits
+	     the same sandbox as a shipped build; the network.server key is also
+	     what Flutter's tooling needs for hot reload. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>com.apple.security.network.server</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>
