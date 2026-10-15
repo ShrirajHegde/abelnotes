@@ -118,6 +118,9 @@ abstract class RemoteStore {
   /// Removes a file or a directory with everything under it.
   Future<void> delete(String remotePath);
 
+  /// Renames a file within its folder. Throws if [toPath] already exists.
+  Future<void> rename(String fromPath, String toPath);
+
   /// Version token + modification time in one round trip, or null if the
   /// file doesn't exist.
   Future<({String? version, DateTime? lastModified})?> getFileInfo(

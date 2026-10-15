@@ -196,6 +196,20 @@ class GoogleDriveStore implements RemoteStore {
   }
 
   @override
+  Future<void> rename(String fromPath, String toPath) async {
+    if (await _fileId(toPath) != null) {
+      throw RemoteStoreException('rename target exists: $toPath', 412);
+    }
+    final id = await _fileId(fromPath);
+    if (id == null) throw RemoteStoreException('no such file: $fromPath', 404);
+    await _send(() => _request('PATCH', '$_apiRoot/files/$id',
+        headers: {'Content-Type': 'application/json'},
+        body: utf8.encode(jsonEncode({'name': _nameOf(toPath)}))));
+    _forget(fromPath);
+    _idCache[toPath] = id;
+  }
+
+  @override
   Future<({String? version, DateTime? lastModified})?> getFileInfo(
       String remotePath) async {
     final meta = await _metadata(remotePath);

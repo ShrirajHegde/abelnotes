@@ -70,6 +70,7 @@ class FileService {
       onUpgrade: _upgradeTables,
     );
     await _migrateRemotePathPrefix();
+    await _migrateStorageExtension();
 
     _initialized = true;
     debugPrint('[FileService] Initialized at $_basePath');
@@ -154,6 +155,43 @@ class FileService {
     final cols = await db.rawQuery('PRAGMA table_info(notebooks)');
     if (cols.any((c) => c['name'] == column)) return;
     await db.execute('ALTER TABLE notebooks ADD COLUMN $column $definition');
+  }
+
+  /// Moves what an older build stored as `.ncnote` to [AppConfig.storageExtension]:
+  /// files in the store, trash and snapshots, and the remote paths in the
+  /// index (library sync renames the server copies). When both spellings
+  /// exist an older build ran in between, and the newer file wins.
+  Future<void> _migrateStorageExtension() async {
+    const legacy = AppConfig.legacyStorageExtension;
+    const next = AppConfig.storageExtension;
+    if (legacy == next) return;
+    final stale = <File>[];
+    for (final dir in [_notebooksDir, _trashDir, _snapshotsDir]) {
+      await for (final e in Directory(dir).list(recursive: true)) {
+        if (e is File && e.path.endsWith(legacy)) stale.add(e);
+      }
+    }
+    for (final old in stale) {
+      final target = File(AppConfig.toStorageName(old.path));
+      try {
+        if (await target.exists() &&
+            !(await old.lastModified()).isAfter(await target.lastModified())) {
+          await old.delete();
+        } else {
+          // Windows refuses to rename onto an existing file.
+          if (await target.exists()) await target.delete();
+          await old.rename(target.path);
+        }
+      } catch (e) {
+        debugPrint('[FileService] Could not rename ${old.path}: $e');
+      }
+    }
+    await _db.rawUpdate(
+      'UPDATE notebooks SET remote_path = '
+      'substr(remote_path, 1, length(remote_path) - ?) || ? '
+      'WHERE remote_path LIKE ?',
+      [legacy.length, next, '%$legacy'],
+    );
   }
 
   // ── Local File I/O ──

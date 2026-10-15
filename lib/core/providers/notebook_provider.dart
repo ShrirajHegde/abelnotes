@@ -318,15 +318,17 @@ class NotebookListNotifier
     FileService fileService,
   ) async {
     await remote.ensureBaseDirectory();
-    final remoteFiles = await syncService.listRemoteNotebooks();
+    final remoteFiles = await _adoptStorageExtension(
+        remote, syncService, await syncService.listRemoteNotebooks());
     debugPrint('[Library] PROPFIND returned ${remoteFiles.length} .ncnote files');
 
-    // Build map of locally cached ETags keyed by remote path
+    // Build map of locally cached ETags keyed by remote path, without the
+    // extension: a rename half-done by another device must still match.
     final localRows = await fileService.getAllNotebookMeta();
     final localByPath = <String, Map<String, dynamic>>{};
     for (final row in localRows) {
       final rp = row['remote_path'] as String? ?? '';
-      if (rp.isNotEmpty) localByPath[rp] = row;
+      if (rp.isNotEmpty) localByPath[AppConfig.notebookStem(rp)] = row;
     }
 
     // Track which remote paths we've seen (to detect deletions)
@@ -341,13 +343,17 @@ class NotebookListNotifier
     final metaOnlyRows = <Map<String, dynamic>>[];
     // Deleted here, remote delete still queued: downloading it would bring
     // the notebook straight back.
-    final deletingPaths = (await PendingRemoteDeletes.load()).values.toSet();
+    final deletingPaths = {
+      for (final rp in (await PendingRemoteDeletes.load()).values)
+        AppConfig.notebookStem(rp)
+    };
     for (final file in remoteFiles) {
       final remotePath = '${AppConfig.defaultRemotePath}${file.name}';
-      seenRemotePaths.add(remotePath);
-      if (deletingPaths.contains(remotePath)) continue;
+      final stem = AppConfig.notebookStem(remotePath);
+      seenRemotePaths.add(stem);
+      if (deletingPaths.contains(stem)) continue;
 
-      final localRow = localByPath[remotePath];
+      final localRow = localByPath[stem];
       final localEtag = localRow?['etag'] as String?;
 
       // This device was told not to keep this notebook. It stays a stub card
@@ -499,7 +505,7 @@ class NotebookListNotifier
     final etagUnchanged = <Map<String, dynamic>>[];
     for (final file in remoteFiles) {
       final remotePath = '${AppConfig.defaultRemotePath}${file.name}';
-      final localRow = localByPath[remotePath];
+      final localRow = localByPath[AppConfig.notebookStem(remotePath)];
       if (localRow == null) continue;
       final localEtag = localRow['etag'] as String?;
       if (localEtag == null || localEtag != file.version) continue;
@@ -579,7 +585,7 @@ class NotebookListNotifier
       // Kept on this device on purpose: not being on the remote is its
       // normal state, not proof the user deleted it elsewhere.
       if ((row['local_only'] as int? ?? 0) == 1) continue;
-      if (seenRemotePaths.contains(rp)) continue;
+      if (seenRemotePaths.contains(AppConfig.notebookStem(rp))) continue;
       if (id == openIdForRemoval) {
         debugPrint('[Library] Skipping remote-delete cleanup for $id — notebook is currently open');
         continue;
@@ -626,6 +632,75 @@ class NotebookListNotifier
     if (changed && mounted) {
       await _loadFromLocalDb(fileService);
     }
+  }
+
+  /// `${title}_${uuid}` plus either notebook extension.
+  static final _rootIdRe = RegExp(
+      r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.(?:ncnote|abelnote)$');
+
+  /// Legacy-named roots seen without a delta folder this session.
+  final Set<String> _legacyWithoutDelta = {};
+
+  /// Server files an older build named `.ncnote` get renamed to
+  /// [AppConfig.storageExtension]. When the new name is already there, the old
+  /// one is a root an older device re-uploaded under the name it remembered:
+  /// stale by design (pages live in the delta folder), so it goes.
+  ///
+  /// Only notebooks with a delta folder are touched: builds up to 0.37.6 drop
+  /// their local copy of a synced notebook whose root vanished unless that
+  /// folder is there. The rest keep the old name until someone edits them.
+  /// Returns the listing as it now stands; a failed rename keeps the old
+  /// entry, which the stem-keyed matching in [_syncWithServer] still pairs.
+  Future<List<RemoteItem>> _adoptStorageExtension(RemoteStore remote,
+      SyncService syncService, List<RemoteItem> files) async {
+    final names = {for (final f in files) f.name};
+    final out = <RemoteItem>[];
+    for (final f in files) {
+      final next = AppConfig.toStorageName(f.name);
+      if (next == f.name) {
+        out.add(f);
+        continue;
+      }
+      final twin = names.contains(next);
+      final id = _rootIdRe.firstMatch(f.name)?.group(1);
+      var hasDelta = false;
+      if (id != null && !_legacyWithoutDelta.contains(f.name)) {
+        try {
+          hasDelta = await syncService.deltaFolderExists(id, fresh: true);
+        } catch (_) {}
+        if (!hasDelta) _legacyWithoutDelta.add(f.name);
+      }
+      if (!hasDelta) {
+        // A twin with no delta folder would make both copies download every
+        // pass; the new name stands for it.
+        if (!twin) out.add(f);
+        continue;
+      }
+      final from = '${AppConfig.defaultRemotePath}${f.name}';
+      final to = '${AppConfig.defaultRemotePath}$next';
+      try {
+        if (twin) {
+          await remote.delete(from);
+          unawaited(CrashLogger.append('[Ext] dropped stale twin $from'));
+        } else {
+          await remote.rename(from, to);
+          unawaited(CrashLogger.append('[Ext] renamed $from'));
+          out.add(RemoteItem(
+            path: to,
+            name: next,
+            isDirectory: false,
+            contentLength: f.contentLength,
+            version: f.version,
+            lastModified: f.lastModified,
+            contentType: f.contentType,
+          ));
+        }
+      } catch (e) {
+        debugPrint('[Library] Could not rename $from: $e');
+        out.add(f);
+      }
+    }
+    return out;
   }
 
   /// The card reads the DB row but the editor reads the stored metadata.json:
@@ -695,9 +770,7 @@ class NotebookListNotifier
         // PARALLEL with the root download, halving the per-notebook latency
         // on the initial sync pass.  If the filename doesn't embed a UUID,
         // fall back to sequential fetch after parsing the root ZIP.
-        final uuidRe = RegExp(
-            r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.ncnote$');
-        final uuidMatch = uuidRe.firstMatch(file.name);
+        final uuidMatch = _rootIdRe.firstMatch(file.name);
 
         // ── Fast path: if we already have a local copy of this notebook AND
         // the delta folder is alive on the server, skip the big root .ncnote
@@ -1147,7 +1220,7 @@ class NotebookListNotifier
     final remote = _ref.read(remoteStoreProvider);
     if (remote == null) return;
     try {
-      await remote.delete(entry.remotePath);
+      await _deleteRoot(remote, entry.remotePath);
     } catch (e) {
       debugPrint('[Library] Remote copy delete failed: $e');
     }
@@ -1225,7 +1298,16 @@ class NotebookListNotifier
       throw StateError('No remote to delete from');
     }
     await syncService.deleteDeltaFolder(id);
-    if (remotePath.isNotEmpty) await remote.delete(remotePath);
+    await _deleteRoot(remote, remotePath);
+  }
+
+  /// The root under either spelling: another device may have renamed it
+  /// since this one last listed the server.
+  Future<void> _deleteRoot(RemoteStore remote, String remotePath) async {
+    if (remotePath.isEmpty) return;
+    final stem = AppConfig.notebookStem(remotePath);
+    await remote.delete('$stem${AppConfig.storageExtension}');
+    await remote.delete('$stem${AppConfig.legacyStorageExtension}');
   }
 
   Future<void> _retryPendingRemoteDeletes() async {
@@ -1590,7 +1672,8 @@ class NotebookListNotifier
         await PendingRootUploads.remove(id);
         return;
       }
-      if (!await syncService.remoteFileExists(remotePath)) {
+      // Under the old name it is there already; library sync renames it.
+      if (!await syncService.notebookRootExists(remotePath)) {
         SyncService.validateNcnoteArchive(bytes, context: 'root retry $id');
         await syncService.uploadNcnoteZip(remotePath, bytes);
         storageFull.value = false;
@@ -1799,7 +1882,7 @@ class NotebookListNotifier
     if (!wasOnServer) return false;
     if (await syncService.deltaFolderExists(id, fresh: true)) return false;
     final root = row['remote_path'] as String? ?? '';
-    return root.isEmpty || await syncService.remoteFileAbsent(root);
+    return root.isEmpty || await syncService.notebookRootAbsent(root);
   }
 
   Future<void> _keepAfterRemoteDelete(FileService fileService, String id) async {

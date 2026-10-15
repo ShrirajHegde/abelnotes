@@ -97,6 +97,30 @@ void main() {
     expect(upload.url.queryParameters['uploadType'], 'multipart');
   });
 
+  test('renames in place by patching the name', () async {
+    fake.reply({'files': [{'id': 'folder-1'}]}); // /AbelNotes/
+    fake.reply({'files': []}); // target name is free
+    fake.reply({'files': [{'id': 'file-1'}]}); // source
+    fake.reply({'id': 'file-1'});
+
+    await store().rename('/AbelNotes/nb.ncnote', '/AbelNotes/nb.abelnote');
+
+    final patch = fake.seen.last as http.Request;
+    expect(patch.method, 'PATCH');
+    expect(patch.url.path, endsWith('/files/file-1'));
+    expect(jsonDecode(patch.body), {'name': 'nb.abelnote'});
+  });
+
+  test('refuses to rename onto an existing file', () async {
+    fake.reply({'files': [{'id': 'folder-1'}]});
+    fake.reply({'files': [{'id': 'file-9'}]}); // target taken
+
+    expect(
+      () => store().rename('/AbelNotes/nb.ncnote', '/AbelNotes/nb.abelnote'),
+      throwsA(isA<RemoteStoreException>()),
+    );
+  });
+
   test('a first upload creates the file under its parent', () async {
     fake.reply({'files': [{'id': 'folder-1'}]});
     fake.reply({'files': []}); // not there yet

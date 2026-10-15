@@ -1047,6 +1047,9 @@ class WebDavService implements RemoteStore {
     }
   }
 
+  @override
+  Future<void> rename(String fromPath, String toPath) => move(fromPath, toPath);
+
   /// Muove/rinomina un file o cartella remota.
   Future<void> move(String fromPath, String toPath) async {
     final request = http.Request('MOVE', Uri.parse(_fullUrl(fromPath)));

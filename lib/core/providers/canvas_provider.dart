@@ -8871,7 +8871,7 @@ class CanvasNotifier extends StateNotifier<CanvasState?> {
         return false;
       }
       final root = st.remotePath;
-      return root.isEmpty || await sync.remoteFileAbsent(root);
+      return root.isEmpty || await sync.notebookRootAbsent(root);
     } catch (_) {
       return false;
     }

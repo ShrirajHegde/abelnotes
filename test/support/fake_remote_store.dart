@@ -59,6 +59,19 @@ class FakeRemoteStore implements RemoteStore {
   }
 
   @override
+  Future<void> rename(String fromPath, String toPath) async {
+    calls.add('rename $fromPath $toPath');
+    if (files.containsKey(toPath)) {
+      throw RemoteStoreException('rename target exists: $toPath', 412);
+    }
+    final data = files.remove(fromPath);
+    if (data == null) throw RemoteStoreException('no such file: $fromPath', 404);
+    files[toPath] = data;
+    final v = _versions.remove(fromPath);
+    if (v != null) _versions[toPath] = v;
+  }
+
+  @override
   Future<Uint8List> downloadFile(String remotePath,
       {int? timeoutSeconds, bool criticalVerify = false}) async {
     calls.add('download $remotePath');

@@ -926,6 +926,21 @@ class SyncService {
     }
   }
 
+  /// [remoteFileAbsent] for a notebook root under both spellings, so a
+  /// rename another device is part-way through never reads as a deletion.
+  Future<bool> notebookRootAbsent(String remotePath) async {
+    final stem = AppConfig.notebookStem(remotePath);
+    return await remoteFileAbsent('$stem${AppConfig.storageExtension}') &&
+        await remoteFileAbsent('$stem${AppConfig.legacyStorageExtension}');
+  }
+
+  /// Whether the notebook root is on the server under either spelling.
+  Future<bool> notebookRootExists(String remotePath) async {
+    final stem = AppConfig.notebookStem(remotePath);
+    return await remoteFileExists('$stem${AppConfig.storageExtension}') ||
+        await remoteFileExists('$stem${AppConfig.legacyStorageExtension}');
+  }
+
   /// Current server version of each of [fileNames] under pages/, null where
   /// the page is not there. Throws on any failure other than a 404.
   Future<Map<String, String?>> getPageVersions(

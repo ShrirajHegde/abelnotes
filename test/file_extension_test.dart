@@ -10,10 +10,10 @@ void main() {
       expect(AppConfig.fileExtension, '.abelnote');
     });
 
-    test('storage and WebDAV keep the pre-rename spelling', () {
-      // Renaming these would orphan local notebooks and make other devices
-      // miss everything already on the user's server.
-      expect(AppConfig.storageExtension, '.ncnote');
+    test('storage and the remote use it too, the old one is still known', () {
+      // Older files are renamed on sight; see storage_extension_test.dart.
+      expect(AppConfig.storageExtension, '.abelnote');
+      expect(AppConfig.legacyStorageExtension, '.ncnote');
     });
 
     test('both spellings are recognised, case-insensitively', () {

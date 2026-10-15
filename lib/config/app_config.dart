@@ -100,12 +100,31 @@ class AppConfig {
   //    rename. Still accepted on open/import: it names exports already in the
   //    wild and notebooks synced by devices that haven't updated.
   //  * [storageExtension] names files inside the local store, the trash and
-  //    the user's WebDAV server. Deliberately NOT renamed — changing it would
-  //    orphan existing local notebooks and make other devices miss every
-  //    notebook already on the server.
+  //    the remote. Renamed after the user-facing one: builds since 0.37.4
+  //    already list both spellings on the remote, and older files are
+  //    renamed on sight (locally at startup, remotely during library sync).
   static const String fileExtension = '.abelnote';
   static const String legacyFileExtension = '.ncnote';
-  static const String storageExtension = '.ncnote';
+  static const String storageExtension = '.abelnote';
+  static const String legacyStorageExtension = '.ncnote';
+
+  /// [path] with a legacy storage extension swapped for [storageExtension];
+  /// any other path comes back unchanged.
+  static String toStorageName(String path) =>
+      path.toLowerCase().endsWith(legacyStorageExtension)
+          ? path.substring(0, path.length - legacyStorageExtension.length) +
+              storageExtension
+          : path;
+
+  /// [path] without its notebook extension, so both spellings of one
+  /// notebook compare equal.
+  static String notebookStem(String path) {
+    final lower = path.toLowerCase();
+    for (final ext in const [storageExtension, legacyStorageExtension]) {
+      if (lower.endsWith(ext)) return path.substring(0, path.length - ext.length);
+    }
+    return path;
+  }
 
   /// Whether [path] names a notebook archive, in either the current or the
   /// pre-rename spelling.
