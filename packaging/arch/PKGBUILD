@@ -10,9 +10,11 @@ depends=(
     'gtk3'
     'libsecret'
     'sqlite'
+    'xdg-user-dirs'
 )
 optdepends=(
-    'poppler: PDF rendering utilities'
+    'zenity: file dialogs for import and export'
+    'kdialog: file dialogs on KDE'
 )
 provides=('abelnotes')
 conflicts=('abelnotes')
