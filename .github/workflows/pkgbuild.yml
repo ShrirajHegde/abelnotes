@@ -1,0 +1,37 @@
+name: PKGBUILD
+
+# Builds and lints the package in a clean Arch container. update.sh stays a
+# local helper (it ends in `paru -Bi`); this only checks what is committed.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    # Container jobs default to sh; PKGBUILD needs bash (source, arrays).
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: pacman -Syu --noconfirm --needed git namcap
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          source PKGBUILD
+          pacman -S --noconfirm --needed "${depends[@]}"
+      - name: Build
+        run: |
+          useradd -m builder
+          chown -R builder .
+          su builder -c 'makepkg --noconfirm --cleanbuild'
+      - name: .SRCINFO is up to date
+        run: su builder -c 'makepkg --printsrcinfo' | diff - .SRCINFO
+      - name: namcap
+        run: namcap PKGBUILD ./*.pkg.tar.zst
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: '*.pkg.tar.zst'
